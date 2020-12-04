@@ -116,6 +116,7 @@ bool LongitudinalAssociationAlgorithm::AreClustersAssociated(const Cluster *cons
 
     const CartesianVector innerEndCentroid(pInnerCluster->GetCentroid(pInnerCluster->GetOuterPseudoLayer()));
     const CartesianVector outerStartCentroid(pOuterCluster->GetCentroid(pOuterCluster->GetInnerPseudoLayer()));
+    const CartesianVector outerEndCentroid(pOuterCluster->GetCentroid(pOuterCluster->GetOuterPseudoLayer()));
 
     if ((innerEndCentroid - outerStartCentroid).GetMagnitudeSquared() > m_maxGapDistanceSquared)
         return false;
@@ -124,20 +125,33 @@ bool LongitudinalAssociationAlgorithm::AreClustersAssociated(const Cluster *cons
     PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, ClusterFitHelper::FitEnd(pInnerCluster, m_fitLayers, innerEndFit));
     PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, ClusterFitHelper::FitStart(pOuterCluster, m_fitLayers, outerStartFit));
 
-    if (this->AreClustersAssociated(innerEndCentroid, outerStartCentroid, innerEndFit, outerStartFit))
-        return true;
+    ClusterList innerClusters, outerClusters;
+    innerClusters.push_back(pInnerCluster);
+    outerClusters.push_back(pOuterCluster);
+    PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+    PandoraMonitoringApi::VisualizeClusters(this->GetPandora(),&innerClusters, "InnerClusters", RED);
+    PandoraMonitoringApi::VisualizeClusters(this->GetPandora(),&outerClusters, "OuterClusters", BLUE);
 
+    std::cout << "Calling overloaded function..." <<std::endl;
+    if (this->AreClustersAssociated(innerEndCentroid, outerStartCentroid, outerEndCentroid, innerEndFit, outerStartFit))
+        {
+	std::cout <<"CLUSTERS ARE ASSOCIATED!!!" << std::endl;
+	PandoraMonitoringApi::ViewEvent(this->GetPandora());
+        return true;}
+
+    PandoraMonitoringApi::ViewEvent(this->GetPandora());
     return false;
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
 bool LongitudinalAssociationAlgorithm::AreClustersAssociated(const CartesianVector &innerClusterEnd, const CartesianVector &outerClusterStart,
-    const ClusterFitResult &innerFit, const ClusterFitResult &outerFit) const
+    const CartesianVector &outerClusterEnd, const ClusterFitResult &innerFit, const ClusterFitResult &outerFit) const
 {
     if (!innerFit.IsFitSuccessful() || !outerFit.IsFitSuccessful())
         return false;
 
+    std::cout << "debug: opening angle = " << innerFit.GetDirection().GetCosOpeningAngle(outerFit.GetDirection()) << " min angle = " << m_minCosRelativeAngle << std::endl;
     if (innerFit.GetDirection().GetCosOpeningAngle(outerFit.GetDirection()) < m_minCosRelativeAngle)
         return false;
 
@@ -146,20 +160,43 @@ bool LongitudinalAssociationAlgorithm::AreClustersAssociated(const CartesianVect
 
     const CartesianVector outerStartFit1(outerFit.GetIntercept() + outerFit.GetDirection() * (outerFit.GetDirection().GetDotProduct(outerClusterStart - outerFit.GetIntercept())));
     const CartesianVector outerStartFit2(innerFit.GetIntercept() + innerFit.GetDirection() * (innerFit.GetDirection().GetDotProduct(outerClusterStart - innerFit.GetIntercept())));
+    const CartesianVector outerEndFit1(outerFit.GetIntercept() + outerFit.GetDirection() * (outerFit.GetDirection().GetDotProduct(outerClusterEnd - outerFit.GetIntercept())));
+    const CartesianVector outerEndFit2(innerFit.GetIntercept() + innerFit.GetDirection() * (innerFit.GetDirection().GetDotProduct(outerClusterEnd - innerFit.GetIntercept())));
+
+    PandoraMonitoringApi::AddMarkerToVisualization(this->GetPandora(),&innerEndFit1,"innerEndFit1",BLACK,2);
+    PandoraMonitoringApi::AddMarkerToVisualization(this->GetPandora(),&innerEndFit2,"innerEndFit2",GREEN,2);
+    PandoraMonitoringApi::AddMarkerToVisualization(this->GetPandora(),&outerStartFit1,"outerStartFit1",BLACK,2);
+    PandoraMonitoringApi::AddMarkerToVisualization(this->GetPandora(),&outerStartFit2,"outerStartFit2",GREEN,2);
+    PandoraMonitoringApi::AddMarkerToVisualization(this->GetPandora(),&outerEndFit1,"outerEndFit1",BLACK,3);
+    PandoraMonitoringApi::AddMarkerToVisualization(this->GetPandora(),&outerEndFit2,"outerEndFit2",GREEN,3);
+
+    ///New vars debug
+    const CartesianVector fittedOuterEndSeparation(outerEndFit2 - outerEndFit1);
+    std::cout << "debug: fittedOuterEndSeparation.GetX() " << std::fabs(fittedOuterEndSeparation.GetX()) <<  std::endl;
+    std::cout << "debug: fittedOuterEndSeparation.GetZ() " << std::fabs(fittedOuterEndSeparation.GetZ()) <<  std::endl;
+    //////
 
     const CartesianVector clusterSeparation(outerClusterStart - innerClusterEnd);
 
+    std::cout << "debug: std::fabs(clusterSeparation.GetX()) " << std::fabs(clusterSeparation.GetX()) << " m_hitSizeX * m_maxTransverseDisplacement = " << m_hitSizeX * m_maxTransverseDisplacement << std::endl;
+    std::cout << "debug: std::fabs(clusterSeparation.GetZ()) " << std::fabs(clusterSeparation.GetZ()) << " m_hitSizeZ * m_maxLongitudinalDisplacement = " << m_hitSizeZ * m_maxLongitudinalDisplacement << std::endl;
+    std::cout << "condition = " << ((std::fabs(clusterSeparation.GetX()) < m_hitSizeX * m_maxTransverseDisplacement) && (std::fabs(clusterSeparation.GetZ()) < m_hitSizeZ * m_maxLongitudinalDisplacement)) << std::endl;
     if ((std::fabs(clusterSeparation.GetX()) < m_hitSizeX * m_maxTransverseDisplacement) &&
         (std::fabs(clusterSeparation.GetZ()) < m_hitSizeZ * m_maxLongitudinalDisplacement))
         return true;
 
     const CartesianVector fittedSeparation(outerStartFit1 - innerEndFit1);
 
+    std::cout << "debug: fittedSeparation.GetX() " << std::fabs(fittedSeparation.GetX()) << " m_hitSizeX * m_maxTransverseDisplacement " << m_hitSizeX * m_maxTransverseDisplacement << std::endl;
+    std::cout << "debug: fittedSeparation.GetZ() " << std::fabs(fittedSeparation.GetZ()) << " m_hitSizeZ * m_maxLongitudinalDisplacement " << m_hitSizeZ * m_maxLongitudinalDisplacement << std::endl;
     if ((std::fabs(fittedSeparation.GetX()) < m_hitSizeX * m_maxTransverseDisplacement) &&
         (std::fabs(fittedSeparation.GetZ()) < m_hitSizeZ * m_maxLongitudinalDisplacement))
         return true;
 
     const CartesianVector fittedInnerSeparation(innerEndFit2 - innerEndFit1);
+
+    std::cout << "debug: fittedInnerSeparation.GetX() " << std::fabs(fittedInnerSeparation.GetX()) << " m_hitSizeX * m_maxTransverseDisplacement " << m_hitSizeX * m_maxTransverseDisplacement << std::endl;
+    std::cout << "debug: fittedInnerSeparation.GetZ() " << std::fabs(fittedInnerSeparation.GetZ()) << " m_hitSizeZ * m_maxLongitudinalDisplacement " << m_hitSizeZ * m_maxLongitudinalDisplacement << std::endl;
 
     if ((std::fabs(fittedInnerSeparation.GetX()) < m_hitSizeX * m_maxTransverseDisplacement) &&
         (std::fabs(fittedInnerSeparation.GetZ()) < m_hitSizeZ * m_maxLongitudinalDisplacement))
