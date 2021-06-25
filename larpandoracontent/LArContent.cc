@@ -130,6 +130,8 @@
 #include "larpandoracontent/LArThreeDReco/LArTwoViewMatching/TwoViewSimpleTracksTool.h"
 #include "larpandoracontent/LArThreeDReco/LArTwoViewMatching/TwoViewTransverseTracksAlgorithm.h"
 
+#include "larpandoracontent/LArThreeDReco/ThirdViewRecoveryAlgorithm.h"
+
 #include "larpandoracontent/LArVertex/EnergyKickFeatureTool.h"
 #include "larpandoracontent/LArVertex/GlobalAsymmetryFeatureTool.h"
 #include "larpandoracontent/LArVertex/LocalAsymmetryFeatureTool.h"
@@ -242,6 +244,7 @@
     d("LArThreeDRemnants",                      ThreeViewRemnantsAlgorithm)                                                     \
     d("LArThreeDShowers",                       ThreeViewShowersAlgorithm)                                                      \
     d("LArThreeDTrackFragments",                ThreeViewTrackFragmentsAlgorithm)                                               \
+    d("LArThirdViewRecovery",                   ThirdViewRecoveryAlgorithm)                                                \
     d("LArThreeDTransverseTracks",              ThreeViewTransverseTracksAlgorithm)                                             \
     d("LArTwoViewTransverseTracks",             TwoViewTransverseTracksAlgorithm)                                               \
     d("LArCutClusterCharacterisation",          CutClusterCharacterisationAlgorithm)                                            \
