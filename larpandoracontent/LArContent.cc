@@ -115,6 +115,7 @@
 #include "larpandoracontent/LArThreeDReco/LArPfoMopUp/SlidingConePfoMopUpAlgorithm.h"
 #include "larpandoracontent/LArThreeDReco/LArPfoMopUp/VertexBasedPfoMopUpAlgorithm.h"
 
+#include "larpandoracontent/LArThreeDReco/LArPfoRecovery/ParticleConsistencyAlgorithm.h"
 #include "larpandoracontent/LArThreeDReco/LArPfoRecovery/ParticleRecoveryAlgorithm.h"
 #include "larpandoracontent/LArThreeDReco/LArPfoRecovery/VertexBasedPfoRecoveryAlgorithm.h"
 
@@ -266,6 +267,7 @@
     d("LArShowerHierarchyMopUp",                ShowerHierarchyMopUpAlgorithm)                                                  \
     d("LArShowerPfoMopUp",                      ShowerPfoMopUpAlgorithm)                                                        \
     d("LArVertexBasedPfoMopUp",                 VertexBasedPfoMopUpAlgorithm)                                                   \
+    d("LArParticleConsistency",                 ParticleConsistencyAlgorithm)                                                   \
     d("LArParticleRecovery",                    ParticleRecoveryAlgorithm)                                                      \
     d("LArVertexBasedPfoRecovery",              VertexBasedPfoRecoveryAlgorithm)                                                \
     d("LArThreeDRemnants",                      ThreeViewRemnantsAlgorithm)                                                     \
