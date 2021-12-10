@@ -19,7 +19,6 @@ namespace lar_content
 
 StatusCode LeftoverClusterAlgorithm::Run()
 {
-
     for (size_t i = 0; i < m_clusterListNames.size(); ++i)
     {
         const std::string inputClusterListName{m_clusterListNames.at(i)};
@@ -28,17 +27,13 @@ StatusCode LeftoverClusterAlgorithm::Run()
             PandoraContentApi::GetList(*this, inputClusterListName, pClusterList));
         const std::string outputClusterListName{m_outputClusterListNames.at(i)};
         ClusterList outputClusterList;
-        //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, outputClusterListName, pOutputClusterList));
 
         if (pClusterList && !pClusterList->empty())
         {
             for (const Cluster *const pCluster : *pClusterList)
             {
-                std::cout << "Cluster " << pCluster << " " << pCluster->IsAvailable() << std::endl;
                 if (pCluster->IsAvailable())
-                {
                     outputClusterList.emplace_back(pCluster);
-                }
             }
         }
         PandoraContentApi::SaveList<ClusterList>(*this, inputClusterListName, outputClusterListName, outputClusterList);
