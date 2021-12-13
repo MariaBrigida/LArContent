@@ -29,10 +29,21 @@ StatusCode HierarchyDissolutionAlgorithm::Run()
         {
             for (const ParticleFlowObject *pParent : *pPfoList)
             {
-                const PfoList &childList{pParent->GetDaughterPfoList()};
-                for (const ParticleFlowObject *pChild : childList)
+                // ATTN - RemovePfoParentDaughterRelationship modifies the daughter list, invalidating any iterator, which is why we need
+                // this loop construct to reacquire the daughter list each time, rather than a simple loop over the daughter list
+                bool rerun{true};
+                while (rerun)
                 {
-                    PandoraContentApi::RemovePfoParentDaughterRelationship(*this, pParent, pChild);
+                    const PfoList &childList{pParent->GetDaughterPfoList()};
+                    if (!childList.empty())
+                    {
+                        const ParticleFlowObject *pChild{childList.front()};
+                        PandoraContentApi::RemovePfoParentDaughterRelationship(*this, pParent, pChild);
+                    }
+                    else
+                    {
+                        rerun = false;
+                    }
                 }
             }
         }
