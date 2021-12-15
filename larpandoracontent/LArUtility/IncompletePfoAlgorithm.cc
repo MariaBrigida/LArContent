@@ -33,8 +33,11 @@ StatusCode IncompletePfoAlgorithm::Run()
         const CaloHitList *pCaloHitList{nullptr};
         PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_INITIALIZED, !=,
             PandoraContentApi::GetList(*this, listName, pCaloHitList));
-        nameToCaloHitListMap[listName] = CaloHitList(*pCaloHitList);
-        PandoraContentApi::RenameList<CaloHitList>(*this, listName, tempListName);
+        if (pCaloHitList)
+        {
+            nameToCaloHitListMap[listName] = CaloHitList(*pCaloHitList);
+            PandoraContentApi::RenameList<CaloHitList>(*this, listName, tempListName);
+        }
     }
 
     for (std::string listName : m_pfoListNames)
@@ -42,6 +45,8 @@ StatusCode IncompletePfoAlgorithm::Run()
         const PfoList *pPfoList{nullptr};
         PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_INITIALIZED, !=,
             PandoraContentApi::GetList(*this, listName, pPfoList));
+        if (!pPfoList)
+            continue;
         PfoList allPfos;
         LArPfoHelper::GetAllDownstreamPfos(*pPfoList, allPfos);
 
@@ -75,6 +80,8 @@ StatusCode IncompletePfoAlgorithm::Run()
                         pCluster->GetOrderedCaloHitList().FillCaloHitList(hitsToRemove);
                         for (std::string caloHitListName : m_caloHitListNames)
                         {
+                            if (nameToCaloHitListMap.find(caloHitListName) == nameToCaloHitListMap.end())
+                                continue;
                             CaloHitList &caloHitList{nameToCaloHitListMap[caloHitListName]};
                             for (const CaloHit *pCaloHit : hitsToRemove)
                             {
@@ -88,6 +95,13 @@ StatusCode IncompletePfoAlgorithm::Run()
                         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RemoveFromPfo(*this, pPfo, pCluster));
                         for (std::string clusterListName : m_clusterListNames)
                         {
+                            // Check the list actually exists before trying to delete from it
+                            const ClusterList *pClusterList{nullptr};
+                            PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_INITIALIZED, !=,
+                                PandoraContentApi::GetList(*this, clusterListName, pClusterList));
+                            if (!pClusterList)
+                                continue;
+
                             PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=,
                                 PandoraContentApi::Delete<Cluster>(*this, pCluster, clusterListName));
                         }
@@ -127,8 +141,11 @@ StatusCode IncompletePfoAlgorithm::Run()
     // ATTN - Whether we made edits or not, the earlier renaming means we need to save what's left back to the original list names here
     for (std::string caloHitListName : m_caloHitListNames)
     {
-        CaloHitList &caloHitList{nameToCaloHitListMap[caloHitListName]};
-        PandoraContentApi::SaveList<CaloHitList>(*this, caloHitList, caloHitListName);
+        if (nameToCaloHitListMap.find(caloHitListName) != nameToCaloHitListMap.end())
+        {
+            CaloHitList &caloHitList{nameToCaloHitListMap[caloHitListName]};
+            PandoraContentApi::SaveList<CaloHitList>(*this, caloHitList, caloHitListName);
+        }
     }
 
     return STATUS_CODE_SUCCESS;
