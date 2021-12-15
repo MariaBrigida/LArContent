@@ -102,8 +102,10 @@ StatusCode IncompletePfoAlgorithm::Run()
                             if (!pClusterList)
                                 continue;
 
-                            PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=,
-                                PandoraContentApi::Delete<Cluster>(*this, pCluster, clusterListName));
+                            const StatusCode status{PandoraContentApi::Delete<Cluster>(*this, pCluster, clusterListName)};
+                            PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, status);
+                            if (status == STATUS_CODE_SUCCESS)
+                                break;
                         }
                     }
                 }
