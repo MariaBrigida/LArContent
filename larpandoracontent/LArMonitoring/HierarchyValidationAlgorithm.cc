@@ -63,7 +63,7 @@ StatusCode HierarchyValidationAlgorithm::Run()
     LArHierarchyHelper::FillRecoHierarchy(*pPfoList, foldParameters, recoHierarchy);
     LArHierarchyHelper::MatchInfo matchInfo;
     LArHierarchyHelper::MatchHierarchies(mcHierarchy, recoHierarchy, matchInfo);
-    //matchInfo.Print(mcHierarchy);
+    matchInfo.Print(mcHierarchy);
 
     if (m_validateEvent)
         this->EventValidation(matchInfo);
@@ -96,18 +96,16 @@ void HierarchyValidationAlgorithm::EventValidation(const LArHierarchyHelper::Mat
             primaryMCSet.insert(LArMCParticleHelper::GetPrimaryMCParticle(pMC));
             const int nReco{static_cast<int>(mcMatch.GetRecoMatches().size())};
             const bool isQuality{mcMatch.IsQuality(matchInfo.GetQualityCuts())};
-            if (nReco == 1 && isQuality)
+            if (isQuality)
                 ++nGoodMatches;
-            else if (nReco == 1)
-                ++nPoorMatches;
-            else if (nReco > 1)
+            else if (nReco >= 1)
                 ++nPoorMatches;
             else
                 ++nUnmatched;
             if (pNode->GetHierarchyTier() == 1)
             {
                 ++nTier1Nodes;
-                if (nReco == 1 && isQuality)
+                if (isQuality)
                     ++nGoodTier1Matches;
             }
 
@@ -124,7 +122,7 @@ void HierarchyValidationAlgorithm::EventValidation(const LArHierarchyHelper::Mat
             if (pdg == PHOTON || pdg == E_MINUS)
             {
                 showerNodeSet.insert(pNode);
-                if (nReco == 1 && isQuality)
+                if (isQuality)
                 {
                     ++nGoodShowerMatches;
                     if (pNode->GetHierarchyTier() == 1)
@@ -136,7 +134,7 @@ void HierarchyValidationAlgorithm::EventValidation(const LArHierarchyHelper::Mat
             else
             {
                 trackNodeSet.insert(pNode);
-                if (nReco == 1 && isQuality)
+                if (isQuality)
                 {
                     ++nGoodTrackMatches;
                     if (pNode->GetHierarchyTier() == 1)
@@ -212,6 +210,7 @@ void HierarchyValidationAlgorithm::Fill(const LArHierarchyHelper::MCMatches &mat
     const int tier{pMCNode->GetHierarchyTier()};
     const int mcHits{static_cast<int>(pMCNode->GetCaloHits().size())};
     const int isLeadingLepton{pMCNode->IsLeadingLepton() ? 1 : 0};
+    const int isQuality{matches.IsQuality(matchInfo.GetQualityCuts()) ? 1: 0};
 
     const MCParticleList &parentList{pMCNode->GetLeadingMCParticle()->GetParentList()};
     const int isElectron{std::abs(pMCNode->GetLeadingMCParticle()->GetParticleId()) == E_MINUS ? 1 : 0};
@@ -272,6 +271,7 @@ void HierarchyValidationAlgorithm::Fill(const LArHierarchyHelper::MCMatches &mat
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "isLeadingLepton", isLeadingLepton));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "isMichel", isMichel));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "nMatches", nMatches));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "isQuality", isQuality));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "recoIdVector", &recoIdVector));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "nRecoHitsVector", &nRecoHitsVector));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "nSharedHitsVector", &nSharedHitsVector));

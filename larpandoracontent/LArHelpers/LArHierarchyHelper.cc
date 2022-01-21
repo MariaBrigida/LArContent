@@ -1160,14 +1160,32 @@ float LArHierarchyHelper::MCMatches::GetCompleteness(const CaloHitVector &inters
 
 bool LArHierarchyHelper::MCMatches::IsQuality(const LArHierarchyHelper::QualityCuts &qualityCuts) const
 {
-    if (m_recoNodes.size() != 1)
+    if (m_recoNodes.empty())
         return false;
 
-    if (this->GetPurity(m_recoNodes.front()) < qualityCuts.m_minPurity)
-        return false;
+    if (m_recoNodes.size() == 1)
+    {
+        if (this->GetPurity(m_recoNodes.front()) < qualityCuts.m_minPurity)
+            return false;
 
-    if (this->GetCompleteness(m_recoNodes.front()) < qualityCuts.m_minCompleteness)
-        return false;
+        if (this->GetCompleteness(m_recoNodes.front()) < qualityCuts.m_minCompleteness)
+            return false;
+    }
+    else
+    {
+        int quality{0}, belowThreshold{0};
+        for (const auto node : m_recoNodes)
+        {
+            const float purity{this->GetPurity(node)};
+            const float completeness{this->GetCompleteness(node)};
+            if (purity >= qualityCuts.m_minPurity && completeness >= qualityCuts.m_minCompleteness)
+                ++quality;
+            else if (completeness < 0.1f)
+                ++belowThreshold;
+        }
+        if (quality != 1 || ((quality + belowThreshold) != static_cast<int>(m_recoNodes.size())))
+            return false;
+    }
 
     return true;
 }
@@ -1212,8 +1230,6 @@ void LArHierarchyHelper::MatchInfo::Match(const MCHierarchy &mcHierarchy, const 
         size_t bestSharedHits{0};
         for (const MCHierarchy::Node *pMCNode : mcNodes)
         {
-            if (!pMCNode->IsReconstructable())
-                continue;
             const CaloHitList &mcHits{pMCNode->GetCaloHits()};
             CaloHitVector intersection;
             std::set_intersection(mcHits.begin(), mcHits.end(), recoHits.begin(), recoHits.end(), std::back_inserter(intersection));
@@ -1228,7 +1244,7 @@ void LArHierarchyHelper::MatchInfo::Match(const MCHierarchy &mcHierarchy, const 
                 }
             }
         }
-        if (pBestNode)
+        if (pBestNode && pBestNode->IsReconstructable())
         {
             auto iter{mcToMatchMap.find(pBestNode)};
             if (iter != mcToMatchMap.end())
@@ -1332,8 +1348,10 @@ void LArHierarchyHelper::MatchInfo::Print(const MCHierarchy &mcHierarchy) const
         const MCHierarchy::Node *pMCNode{match.GetMC()};
         const int pdg{pMCNode->GetParticleId()};
         const size_t mcHits{pMCNode->GetCaloHits().size()};
+        const bool isQuality{match.IsQuality(this->GetQualityCuts())}; 
+
         const std::string tag{pMCNode->IsTestBeamParticle() ? "(Beam) " : pMCNode->IsCosmicRay() ? "(Cosmic) " : ""};
-        std::cout << "MC " << tag << pdg << " hits " << mcHits << std::endl;
+        std::cout << "MC " << tag << pdg << " hits " << mcHits << " Quality: " << isQuality << std::endl;
         const RecoHierarchy::NodeVector &nodeVector{match.GetRecoMatches()};
 
         for (const RecoHierarchy::Node *pRecoNode : nodeVector)
