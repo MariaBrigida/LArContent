@@ -116,7 +116,7 @@ void HierarchyValidationAlgorithm::EventValidation(const LArHierarchyHelper::Mat
                     hasLeadingMuon = 1;
                 else if (pdg == E_MINUS)
                     hasLeadingElectron = 1;
-                isLeadingLeptonCorrect = nReco == 1 ? 1 : 0;
+                isLeadingLeptonCorrect = isQuality ? 1 : 0;
             }
 
             if (pdg == PHOTON || pdg == E_MINUS)
