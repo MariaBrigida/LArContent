@@ -229,6 +229,9 @@ void HierarchyValidationAlgorithm::Fill(const LArHierarchyHelper::MCMatches &mat
     // Identify the best matching reco node (most complete) and use that to determine per particle metrics
     const LArHierarchyHelper::RecoHierarchy::Node *pBestRecoNode{nullptr};
     float maxCompleteness{0.f};
+    FloatVector wRecoHits, wRecoHitsU, wRecoHitsV, wRecoHitsW;
+    IntVector nRecoHits, nRecoHitsU, nRecoHitsV, nRecoHitsW;
+    int totRecoHits{0}, totRecoHitsU{0}, totRecoHitsV{0}, totRecoHitsW{0};
     for (const LArHierarchyHelper::RecoHierarchy::Node *pRecoNode : nodeVector)
     {
         recoIdVector.emplace_back(pRecoNode->GetParticleId());
@@ -241,7 +244,37 @@ void HierarchyValidationAlgorithm::Fill(const LArHierarchyHelper::MCMatches &mat
             pBestRecoNode = pRecoNode;
             maxCompleteness = recoCompleteness;
         }
+
+        float nHits{0.f}, nHitsU{0.f}, nHitsV{0.f}, nHitsW{0.f};
+        for (const CaloHit *pCaloHit : pRecoNode->GetCaloHits())
+        {
+            ++nHits;
+            if (pCaloHit->GetHitType() == TPC_VIEW_U)
+                ++nHitsU;
+            else if (pCaloHit->GetHitType() == TPC_VIEW_V)
+                ++nHitsV;
+            else if (pCaloHit->GetHitType() == TPC_VIEW_W)
+                ++nHitsW;
+
+        }
+        nRecoHits.emplace_back(nHits);
+        nRecoHitsU.emplace_back(nHitsU);
+        nRecoHitsV.emplace_back(nHitsV);
+        nRecoHitsW.emplace_back(nHitsW);
+        totRecoHits += nHits;
+        totRecoHitsU += nHitsU;
+        totRecoHitsV += nHitsV;
+        totRecoHitsW += nHitsW;
     }
+
+    for (size_t i = 0; i < nodeVector.size(); ++i)
+    {
+        wRecoHits.emplace_back(totRecoHits > 0 ? nRecoHits[i] / static_cast<float>(totRecoHits) : 0.f);
+        wRecoHitsU.emplace_back(totRecoHitsU > 0 ? nRecoHitsU[i] / static_cast<float>(totRecoHitsU) : 0.f);
+        wRecoHitsV.emplace_back(totRecoHitsV > 0 ? nRecoHitsV[i] / static_cast<float>(totRecoHitsV) : 0.f);
+        wRecoHitsW.emplace_back(totRecoHitsW > 0 ? nRecoHitsW[i] / static_cast<float>(totRecoHitsW) : 0.f);
+    }
+
     if (pBestRecoNode)
     {
         purity = matches.GetPurity(pBestRecoNode);
@@ -268,6 +301,32 @@ void HierarchyValidationAlgorithm::Fill(const LArHierarchyHelper::MCMatches &mat
         vtxDy = recoVertex.GetY() - trueVertex.GetY();
         vtxDz = recoVertex.GetZ() - trueVertex.GetZ();
         vtxDr = std::sqrt(vtxDx * vtxDx + vtxDy * vtxDy + vtxDz * vtxDz);
+    }
+
+    float purityComp{0.f}, completenessComp{0.f};
+    float purityAdcComp{0.f}, completenessAdcComp{0.f};
+    float purityCompU{0.f}, purityCompV{0.f}, purityCompW{0.f}, completenessCompU{0.f}, completenessCompV{0.f}, completenessCompW{0.f};
+    float purityAdcCompU{0.f}, purityAdcCompV{0.f}, purityAdcCompW{0.f}, completenessAdcCompU{0.f}, completenessAdcCompV{0.f}, completenessAdcCompW{0.f};
+    int i = 0;
+    for (const LArHierarchyHelper::RecoHierarchy::Node *pRecoNode : nodeVector)
+    {
+        purityComp += matches.GetPurity(pRecoNode) * wRecoHits[i];
+        completenessComp += matches.GetCompleteness(pRecoNode) * wRecoHits[i];
+        purityAdcComp += matches.GetPurity(pRecoNode, true) * wRecoHits[i];
+        completenessAdcComp += matches.GetCompleteness(pRecoNode, true) * wRecoHits[i];
+        purityCompU += matches.GetPurity(pRecoNode, TPC_VIEW_U) * wRecoHitsU[i];
+        purityCompV += matches.GetPurity(pRecoNode, TPC_VIEW_V) * wRecoHitsV[i];
+        purityCompW += matches.GetPurity(pRecoNode, TPC_VIEW_W) * wRecoHitsW[i];
+        completenessCompU += matches.GetCompleteness(pRecoNode, TPC_VIEW_U) * wRecoHitsU[i];
+        completenessCompV += matches.GetCompleteness(pRecoNode, TPC_VIEW_V) * wRecoHitsV[i];
+        completenessCompW += matches.GetCompleteness(pRecoNode, TPC_VIEW_W) * wRecoHitsW[i];
+        purityAdcCompU += matches.GetPurity(pRecoNode, TPC_VIEW_U, true) * wRecoHitsU[i];
+        purityAdcCompV += matches.GetPurity(pRecoNode, TPC_VIEW_V, true) * wRecoHitsV[i];
+        purityAdcCompW += matches.GetPurity(pRecoNode, TPC_VIEW_W, true) * wRecoHitsW[i];
+        completenessAdcCompU += matches.GetCompleteness(pRecoNode, TPC_VIEW_U, true) * wRecoHitsU[i];
+        completenessAdcCompV += matches.GetCompleteness(pRecoNode, TPC_VIEW_V, true) * wRecoHitsV[i];
+        completenessAdcCompW += matches.GetCompleteness(pRecoNode, TPC_VIEW_W, true) * wRecoHitsW[i];
+        ++i;
     }
 
     // Would like to add information on hierarchy matching. Needs some thought, it's extremely complicated
@@ -303,6 +362,22 @@ void HierarchyValidationAlgorithm::Fill(const LArHierarchyHelper::MCMatches &mat
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcU", completenessAdcU));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcV", completenessAdcV));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcW", completenessAdcW));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityComp", purityComp));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessComp", completenessComp));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityAdcComp", purityAdcComp));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcComp", completenessAdcComp));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityCompU", purityCompU));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityCompV", purityCompV));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityCompW", purityCompW));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessCompU", completenessCompU));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessCompV", completenessCompV));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessCompW", completenessCompW));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityAdcCompU", purityAdcCompU));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityAdcCompV", purityAdcCompV));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "purityAdcCompW", purityAdcCompW));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcCompU", completenessAdcCompU));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcCompV", completenessAdcCompV));
+    PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "completenessAdcCompW", completenessAdcCompW));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "vtxDx", vtxDx));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "vtxDy", vtxDy));
     PANDORA_MONITORING_API(SetTreeVariable(this->GetPandora(), m_treename.c_str(), "vtxDz", vtxDz));
