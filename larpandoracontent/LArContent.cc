@@ -129,6 +129,8 @@
 #include "larpandoracontent/LArThreeDReco/LArShowerMatching/SplitShowersTool.h"
 #include "larpandoracontent/LArThreeDReco/LArShowerMatching/ThreeViewShowersAlgorithm.h"
 
+#include "larpandoracontent/LArThreeDReco/LArShowerRefining/ShowerSplittingAlgorithm.h"
+
 #include "larpandoracontent/LArThreeDReco/LArTrackFragments/ClearTrackFragmentsTool.h"
 #include "larpandoracontent/LArThreeDReco/LArTrackFragments/ThreeViewTrackFragmentsAlgorithm.h"
 
@@ -276,6 +278,7 @@
     d("LArVertexBasedPfoRecovery",              VertexBasedPfoRecoveryAlgorithm)                                                \
     d("LArThreeDRemnants",                      ThreeViewRemnantsAlgorithm)                                                     \
     d("LArThreeDShowers",                       ThreeViewShowersAlgorithm)                                                      \
+    d("LArShowerSplitting",                     ShowerSplittingAlgorithm)                                                       \
     d("LArThreeDTrackFragments",                ThreeViewTrackFragmentsAlgorithm)                                               \
     d("LArThreeDTransverseTracks",              ThreeViewTransverseTracksAlgorithm)                                             \
     d("LArTwoViewTransverseTracks",             TwoViewTransverseTracksAlgorithm)                                               \

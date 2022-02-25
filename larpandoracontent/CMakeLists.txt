@@ -17,6 +17,7 @@ set( subdir_list LArCheating
 		 LArThreeDReco/LArPfoRecovery
 		 LArThreeDReco/LArShowerFragments
 		 LArThreeDReco/LArShowerMatching
+		 LArThreeDReco/LArShowerRefining
 		 LArThreeDReco/LArThreeDBase
 		 LArThreeDReco/LArTrackFragments
 		 LArThreeDReco/LArTransverseTrackMatching
