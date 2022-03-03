@@ -20,7 +20,20 @@ namespace lar_content
 //class ShowerSplittingAlgorithm : public PfoMopUpBaseAlgorithm
 class ShowerSplittingAlgorithm : public pandora::Algorithm
 {
+
+public:
+    /**
+     *  @brief  Default constructor
+     */
+    ShowerSplittingAlgorithm();
+
+    /**
+     *  @brief  Destructor
+     */
+    ~ShowerSplittingAlgorithm();
+
 private:
+    
     pandora::StatusCode Run();
 
     /**
@@ -49,6 +62,10 @@ private:
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
+    bool m_drawProfiles;
+    bool m_writeToTree;
+    std::string m_fileName;
+    std::string m_treeName;
 };
 
 } // namespace lar_content

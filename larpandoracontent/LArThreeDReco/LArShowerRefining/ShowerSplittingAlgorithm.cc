@@ -18,13 +18,40 @@ using namespace pandora;
 namespace lar_content
 {
 
+ShowerSplittingAlgorithm::ShowerSplittingAlgorithm():
+    m_drawProfiles(false),
+    m_writeToTree(false),
+    m_fileName("OutputFile.root"),
+    m_treeName("OutputTree")
+{
+}
+
+
+ShowerSplittingAlgorithm::~ShowerSplittingAlgorithm()
+{
+    if (m_writeToTree)
+    {
+        try
+        {
+            PANDORA_MONITORING_API(SaveTree(this->GetPandora(), m_treeName.c_str(), m_fileName.c_str(), "UPDATE"));
+        }
+        catch (const StatusCodeException &)
+        {
+            std::cout << "ShowerSplittingAlgorithm: Unable to write tree " << m_treeName << " to file " << m_fileName << std::endl;
+        }
+    }
+}
+
+
 StatusCode ShowerSplittingAlgorithm::Run()
 {
 
     // Hacky location for new shower profile examination code!
     const PfoList *pPfoList(nullptr);
+    int pfoId(0);
     if ((STATUS_CODE_SUCCESS == PandoraContentApi::GetList(*this, m_pfoListName, pPfoList)) && pPfoList)
     {
+        FloatVector position1Vect, position2Vect, energyVect;
         for (const Pfo *const pShowerPfo : *pPfoList)
         {
             ClusterList clusterList3D;
@@ -77,10 +104,26 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
                 const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
                 const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
+                position1Vect.push_back(position1);
+                position2Vect.push_back(position2);
+                energyVect.push_back(pCaloHit3D->GetInputEnergy());
                 transverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
             }
+            std::cout << "pfoId = " << pfoId << " Write to tree = " << m_writeToTree << " drawProfiles = " << m_drawProfiles << std::endl;
+            if(m_writeToTree){
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "pfoId", pfoId);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position1", &position1Vect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position2", &position2Vect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "energy", &energyVect);
+                PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
+
+                position1Vect.clear();
+                position2Vect.clear();
+                energyVect.clear();
+            }
+
             std::cout << "Observed transverse energy profile " << std::endl;
-            PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), transverseProfile, "COLZ");
+            if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), transverseProfile, "COLZ");
             // Observed longitudinal profile
             Histogram observedLongitudinalProfile(101, -0.2, 40.2);
             const float convertGeVToMeV(1000.f);
@@ -97,7 +140,7 @@ StatusCode ShowerSplittingAlgorithm::Run()
             }
 
             std::cout << "Observed longitudinal energy profile " << std::endl;
-            PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedLongitudinalProfile, "");
+            if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedLongitudinalProfile, "");
 
             // Expected longitudinal profile
             Histogram expectedLongitudinalProfile(101, -0.2, 40.2);
@@ -154,10 +197,12 @@ StatusCode ShowerSplittingAlgorithm::Run()
             std::cout << "ClusterEnergyInMeV " << clusterEnergyInMeV << ", profileStart " << profileStart << ", profileDiscrepancy " << profileDiscrepancy << std::endl;
 
             std::cout << "Observed longitudinal energy profile " << std::endl;
-            PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedLongitudinalProfile, "");
+            if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedLongitudinalProfile, "");
 
             std::cout << "Expected longitudinal energy profile " << std::endl;
-            PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), expectedLongitudinalProfile, "");
+            if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), expectedLongitudinalProfile, "");
+            
+            pfoId++;
         }
     }
 
@@ -217,6 +262,17 @@ void ShowerSplittingAlgorithm::PerformPfoMerges(const PfoList &parentShowerPfos)
 StatusCode ShowerSplittingAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "PfoListName", m_pfoListName));
+    PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "DrawProfiles", m_drawProfiles));
+    PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "WriteToTree", m_writeToTree));
+    if (m_writeToTree)
+    {
+        PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "FileName", m_fileName));
+        PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "TreeName", m_treeName));
+
+    }
+
+    //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "FileName", m_fileName));
+    //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "TreeName", m_treeName));
 
     return STATUS_CODE_SUCCESS;
 }
