@@ -10,6 +10,7 @@
 
 #include "larpandoracontent/LArHelpers/LArPfoHelper.h"
 #include "larpandoracontent/LArHelpers/LArPcaHelper.h"
+#include "larpandoracontent/LArHelpers/LArMCParticleHelper.h"
 
 #include "larpandoracontent/LArThreeDReco/LArShowerRefining/ShowerSplittingAlgorithm.h"
 
@@ -49,6 +50,29 @@ StatusCode ShowerSplittingAlgorithm::Run()
     // Hacky location for new shower profile examination code!
     const PfoList *pPfoList(nullptr);
     int pfoId(0);
+
+/////////This comes from MyTrackShowerId algorithm///////
+    const MCParticleList *pMCParticleList(nullptr);
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_mcParticleListName, pMCParticleList));
+   /* 
+    const CaloHitList *pCaloHitList(nullptr);
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_caloHitListName, pCaloHitList));
+
+    // Get reconstructable MC
+    LArMCParticleHelper::MCContributionMap primaryMCParticleToHitsMap;
+    LArMCParticleHelper::PrimaryParameters parameters;
+    parameters.m_foldBackHierarchy = true;
+
+    LArMCParticleHelper::SelectReconstructableMCParticles(pMCParticleList, pCaloHitList, parameters,
+        LArMCParticleHelper::IsBeamNeutrinoFinalState, primaryMCParticleToHitsMap);
+    MCParticleList primaryMCList;
+    for (auto [ pMC, hits ] : primaryMCParticleToHitsMap)
+    {   (void)hits;
+        primaryMCList.emplace_back(pMC);
+    }
+*/
+///////////////////////////////////////////////////////
+
     if ((STATUS_CODE_SUCCESS == PandoraContentApi::GetList(*this, m_pfoListName, pPfoList)) && pPfoList)
     {
         FloatVector position1Vect, position2Vect, energyVect;
@@ -115,7 +139,6 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position1", &position1Vect);
                 PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position2", &position2Vect);
                 PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "energy", &energyVect);
-                PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
 
                 position1Vect.clear();
                 position2Vect.clear();
@@ -203,6 +226,82 @@ StatusCode ShowerSplittingAlgorithm::Run()
             if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), expectedLongitudinalProfile, "");
             
             pfoId++;
+////////////////////////////
+            //1)Get calo hit list for this pfo
+            CaloHitList pShowerCaloHits;
+            LArPfoHelper::GetCaloHits(pShowerPfo, TPC_3D, pShowerCaloHits);
+            //LArPfoHelper::GetCaloHits(pShowerPfo, TPC_VIEW_W, pShowerCaloHits);
+            //2)Fill McToCaloHitList map for these calo hits
+/*            LArMCParticleHelper::MCRelationMap mcToTargetMCMap;
+            LArMCParticleHelper::GetMCPrimaryMap(pMCParticleList, mcToTargetMCMap);
+            LArMCParticleHelper::CaloHitToMCMap hitToMCMap;
+            LArMCParticleHelper::MCContributionMap mcToTrueHitListMap;
+            LArMCParticleHelper::GetMCParticleToCaloHitMatches(&pShowerCaloHits,mcToTargetMCMap,hitToMCMap,mcToTrueHitListMap);
+            //3)Count how many MCparticles in this map contribute to at least 5 hits per view
+            std::cout << "Number of true particles contributing to this pfo = " << mcToTrueHitListMap.size() << " mcToTargetMCMap size = " << mcToTargetMCMap.size() << " hitToMCMap size = " << hitToMCMap.size() << " pShowerCaloHits size = " << pShowerCaloHits.size() <<  std::endl;
+            //4)Save this number to output tree
+*/
+    //CaloHitToCaloHitMap ThreeDHitToTwoDHitMap;
+
+/*    for (const pandora::CaloHit* const pCaloHit : pShowerCaloHits) {
+      if (pCaloHit->GetHitType() != pandora::TPC_3D)
+        throw StatusCodeException(STATUS_CODE_INVALID_PARAMETER); //found a non-3D hit in the input list*/
+    CaloHitList pTwoDHitList;
+    const pandora::CaloHit* parentAddress;
+    for (const pandora::CaloHit* const pCaloHit : pShowerCaloHits)
+    {
+        parentAddress=static_cast<const pandora::CaloHit*>(pCaloHit->GetParentAddress());
+        if(static_cast<const pandora::CaloHit*>(parentAddress)->GetHitType()==pandora::TPC_VIEW_W)pTwoDHitList.insert(pTwoDHitList.end(),static_cast<const pandora::CaloHit*>(parentAddress));
+       
+    }
+
+
+/*      // ATTN get the 2D calo hit from the 3D calo hit
+      if (!ThreeDHitToTwoDHitMap
+             .insert(CaloHitToCaloHitMap::value_type(
+               pCaloHit, static_cast<const pandora::CaloHit*>(pCaloHit->GetParentAddress())))
+             .second)
+        {std::cout << "Found repeated input hit" << std::endl; throw StatusCodeException(STATUS_CODE_INVALID_PARAMETER);} //found repeated input hits
+    }
+
+    //Loop over map to check what we've filled it with
+    for (auto const& x : ThreeDHitToTwoDHitMap)
+    {
+        std::cout << "key hit type = " << x.first->GetHitType()  // string (key)
+              << " value hit type = " 
+              << x.second->GetHitType() // string's value 
+              << std::endl;
+    }*/
+
+            //2)Fill McToCaloHitList map for these calo hits
+    LArMCParticleHelper::MCRelationMap mcToTargetMCMap;
+    //LArMCParticleHelper::GetMCPrimaryMap(pMCParticleList, mcToTargetMCMap); //folded hierarchy
+    LArMCParticleHelper::GetMCToSelfMap(pMCParticleList, mcToTargetMCMap);  //Unfolded hierarchy
+    LArMCParticleHelper::CaloHitToMCMap hitToMCMap;
+    LArMCParticleHelper::MCContributionMap mcToTrueHitListMap;
+    LArMCParticleHelper::GetMCParticleToCaloHitMatches(&pTwoDHitList,mcToTargetMCMap,hitToMCMap,mcToTrueHitListMap);
+
+   MCParticleList pPfoContributingMCParticleList;
+   std::vector<int> pPfoContributingMCParticleNHits;    
+   for ( const auto &pair : mcToTrueHitListMap ) {
+        std::cout << "mc particle energy = " << pair.first->GetEnergy() << " number of hits  = " << pair.second.size() << std::endl;
+        pPfoContributingMCParticleList.insert(pPfoContributingMCParticleList.end(),pair.first);
+        pPfoContributingMCParticleNHits.push_back(pair.second.size());
+    }
+         PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+         PandoraMonitoringApi::VisualizeCaloHits(this->GetPandora(),&pTwoDHitList, "2DCaloHitList", BLUE);
+         PandoraMonitoringApi::VisualizeCaloHits(this->GetPandora(),&pShowerCaloHits, "3DCaloHitList", GREEN);
+         PandoraMonitoringApi::VisualizeMCParticles(this->GetPandora(),&pPfoContributingMCParticleList, "ContributingMCParticles", RED);
+         PandoraMonitoringApi::ViewEvent(this->GetPandora());
+
+            std::cout << "Number of true particles contributing to this pfo = " << mcToTrueHitListMap.size() << " mcToTargetMCMap size = " << mcToTargetMCMap.size() << " hitToMCMap size = " << hitToMCMap.size() << " pShowerCaloHits size = " << pShowerCaloHits.size() << " pTwoDHitList size = " << pTwoDHitList.size() <<  std::endl;
+
+/////////////////////////
+         if(m_writeToTree)
+          { 
+            PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "PfoCpntributingMCParticleHits", &pPfoContributingMCParticleNHits);
+            PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
+          }
         }
     }
 
@@ -262,6 +361,8 @@ void ShowerSplittingAlgorithm::PerformPfoMerges(const PfoList &parentShowerPfos)
 StatusCode ShowerSplittingAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "PfoListName", m_pfoListName));
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "MCParticleListName", m_mcParticleListName));
+    //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "CaloHitListName", m_caloHitListName));
     PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "DrawProfiles", m_drawProfiles));
     PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "WriteToTree", m_writeToTree));
     if (m_writeToTree)

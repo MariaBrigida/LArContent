@@ -22,6 +22,9 @@ class ShowerSplittingAlgorithm : public pandora::Algorithm
 {
 
 public:
+
+    typedef std::map<const pandora::CaloHit*, const pandora::CaloHit*> CaloHitToCaloHitMap;
+
     /**
      *  @brief  Default constructor
      */
@@ -62,6 +65,8 @@ private:
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
+    std::string m_mcParticleListName; ///< The mc particle list name 
+    //std::string m_caloHitListName; ///< The input calo hit list name
     bool m_drawProfiles;
     bool m_writeToTree;
     std::string m_fileName;
