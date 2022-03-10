@@ -76,8 +76,14 @@ StatusCode ShowerSplittingAlgorithm::Run()
     if ((STATUS_CODE_SUCCESS == PandoraContentApi::GetList(*this, m_pfoListName, pPfoList)) && pPfoList)
     {
         FloatVector position1Vect, position2Vect, energyVect;
+        IntVector mainMcPartVect;
         for (const Pfo *const pShowerPfo : *pPfoList)
-        {
+        {       
+            position1Vect.clear();
+            position2Vect.clear();
+            energyVect.clear();
+            mainMcPartVect.clear();
+
             ClusterList clusterList3D;
             LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
             // Get the longitudinal and transverse shower profiles
@@ -125,12 +131,45 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 const CaloHit *const pParentCaloHit(static_cast<const CaloHit *>(pCaloHit3D->GetParentAddress()));
                 if (TPC_VIEW_W != pParentCaloHit->GetHitType())
                     continue;
+                //Find main contributing MC particle Id
+                //MCParticleVector mcParticleVector;
+                int mcParticleIndex(-999),iMcPart(0);
+                for (const auto &weightMapEntry : pParentCaloHit->GetMCParticleWeightMap())
+                {
+                  if(weightMapEntry.second>0.5)
+                  {
+                    std::cout << weightMapEntry.second << std::endl;
+                    iMcPart=0; 
+                    for(const MCParticle *const pMCParticle: *pMCParticleList)
+                    {
+                      if(pMCParticle==weightMapEntry.first) mcParticleIndex=iMcPart;
+                      iMcPart++;
+                    }
+                  }
+                  //mcParticleVector.push_back(weightMapEntry.first);
+                //  std::cout << " weightMapEntry.first = " << weightMapEntry.first << " second = " << weightMapEntry.second << std::endl;
+                }
+                std::cout << "largest contributing mc particle id = " << mcParticleIndex << std::endl;
+                /*int mcParticleIndex(-999),iMcPart(0);
+                for(const MCParticle *const pMCParticle: *pMCParticleList)
+                {
+                      //std::cout << *pMCParticle << std::endl;
+                      if(pParentCaloHit->GetMCParticleWeightMap().at(*pMCParticle))
+                      {
+                        std::cout << "found" << std::endl;
+                      }
+                    const float weight(pParentCaloHit->GetMCParticleWeightMap().at(pMCParticle));
+                    if(weight>0.5)mcParticleIndex=iMcPart;
+                    iMcPart++;
+                }
+                */
                 const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
                 const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
                 const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
                 position1Vect.push_back(position1);
                 position2Vect.push_back(position2);
                 energyVect.push_back(pCaloHit3D->GetInputEnergy());
+                mainMcPartVect.push_back(mcParticleIndex);
                 transverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
             }
             std::cout << "pfoId = " << pfoId << " Write to tree = " << m_writeToTree << " drawProfiles = " << m_drawProfiles << std::endl;
@@ -139,10 +178,9 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position1", &position1Vect);
                 PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position2", &position2Vect);
                 PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "energy", &energyVect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "mainMcParticle", &mainMcPartVect);
+                PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
 
-                position1Vect.clear();
-                position2Vect.clear();
-                energyVect.clear();
             }
 
             std::cout << "Observed transverse energy profile " << std::endl;
@@ -272,7 +310,7 @@ StatusCode ShowerSplittingAlgorithm::Run()
               << x.second->GetHitType() // string's value 
               << std::endl;
     }*/
-
+/*
             //2)Fill McToCaloHitList map for these calo hits
     LArMCParticleHelper::MCRelationMap mcToTargetMCMap;
     //LArMCParticleHelper::GetMCPrimaryMap(pMCParticleList, mcToTargetMCMap); //folded hierarchy
@@ -301,7 +339,7 @@ StatusCode ShowerSplittingAlgorithm::Run()
           { 
             PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "PfoCpntributingMCParticleHits", &pPfoContributingMCParticleNHits);
             PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
-          }
+          }*/
         }
     }
 
