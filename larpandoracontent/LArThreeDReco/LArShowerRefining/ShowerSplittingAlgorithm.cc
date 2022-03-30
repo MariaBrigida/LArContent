@@ -16,6 +16,27 @@
 
 using namespace pandora;
 
+const float convertGeVToMeV(1000.f);
+const float convertCmToX0(1.f / 14.f);
+const float criticalEnergyMeV(30.5f);
+const float atomicNumberArgon(18);
+
+const float longProfileCriticalEnergy(0.08f);
+const float longProfileParameter0(1.25f);
+const float longProfileParameter1(0.5f);
+const float longProfileMaxDifference(0.1f);
+
+
+//bool frequencysort(int i, int j) { return i > j; }
+//bool frequencysort (int i,int j) { return (std::count_if(sortedMainMcPartVect.begin(), sortedMainMcPartVect.end(),[&](int const &i) {return (i == val);}))<std::count_if(sortedMainMcPartVect.begin(), sortedMainMcPartVect.end(),[&](int const &j) {return (j == val);}); }
+
+bool mapValueComparison(const std::pair<int, int>& a,
+         const std::pair<int, int>& b)
+{
+    return a.second < b.second;
+}
+
+
 namespace lar_content
 {
 
@@ -75,14 +96,16 @@ StatusCode ShowerSplittingAlgorithm::Run()
 
     if ((STATUS_CODE_SUCCESS == PandoraContentApi::GetList(*this, m_pfoListName, pPfoList)) && pPfoList)
     {
-        FloatVector position1Vect, position2Vect, energyVect;
-        IntVector mainMcPartVect;
+        FloatVector position1Vect, position2Vect, energyVect, expectedTransverseProfileVect, expectedTransverseProfileRadiusVect;
+        IntVector mainMcPartVect; int mainMcParticle; double mainMcParticleEnergy; 
         for (const Pfo *const pShowerPfo : *pPfoList)
         {       
             position1Vect.clear();
             position2Vect.clear();
             energyVect.clear();
             mainMcPartVect.clear();
+            expectedTransverseProfileVect.clear();
+            expectedTransverseProfileRadiusVect.clear();
 
             ClusterList clusterList3D;
             LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
@@ -124,7 +147,11 @@ StatusCode ShowerSplittingAlgorithm::Run()
             PandoraMonitoringApi::AddLineToVisualization(this->GetPandora(), &centroid, &centroidPlusOrthoDir2, "orthoDirection2", RED, 1, 1);
             PandoraMonitoringApi::ViewEvent(this->GetPandora());
             // Transverse profile
-            TwoDHistogram transverseProfile(501, -150.3, 150.3, 501, -150.3, 150.3);
+            const int nTransverseProfileBins = 61;
+            const float transverseProfileMin = -150.3;
+            const float transverseProfileMax = 150.3;
+            TwoDHistogram transverseProfile(nTransverseProfileBins, transverseProfileMin, transverseProfileMax, nTransverseProfileBins, transverseProfileMin, transverseProfileMax);
+            TwoDHistogram expectedTransverseProfile(nTransverseProfileBins, transverseProfileMin, transverseProfileMax, nTransverseProfileBins, transverseProfileMin, transverseProfileMax);
             const float convertADCToMeV(0.0075f); // (c) Maria
             for (const CaloHit *const pCaloHit3D : caloHitList3D)
             {
@@ -138,7 +165,7 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 {
                   if(weightMapEntry.second>0.5)
                   {
-                    std::cout << weightMapEntry.second << std::endl;
+                    //std::cout << weightMapEntry.second << std::endl;
                     iMcPart=0; 
                     for(const MCParticle *const pMCParticle: *pMCParticleList)
                     {
@@ -149,7 +176,7 @@ StatusCode ShowerSplittingAlgorithm::Run()
                   //mcParticleVector.push_back(weightMapEntry.first);
                 //  std::cout << " weightMapEntry.first = " << weightMapEntry.first << " second = " << weightMapEntry.second << std::endl;
                 }
-                std::cout << "largest contributing mc particle id = " << mcParticleIndex << std::endl;
+                //std::cout << "largest contributing mc particle id = " << mcParticleIndex << std::endl;
                 /*int mcParticleIndex(-999),iMcPart(0);
                 for(const MCParticle *const pMCParticle: *pMCParticleList)
                 {
@@ -172,23 +199,32 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 mainMcPartVect.push_back(mcParticleIndex);
                 transverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
             }
-            std::cout << "pfoId = " << pfoId << " Write to tree = " << m_writeToTree << " drawProfiles = " << m_drawProfiles << std::endl;
-            if(m_writeToTree){
-                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "pfoId", pfoId);
-                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position1", &position1Vect);
-                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position2", &position2Vect);
-                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "energy", &energyVect);
-                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "mainMcParticle", &mainMcPartVect);
-                PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
+            //Find main mc particle contributor to pfo
+            IntVector sortedMainMcPartVect = mainMcPartVect;
 
-            }
+            std::map<int, int> elementToFrequencyMap; 
+            for (unsigned int i = 0; i < sortedMainMcPartVect.size(); i++) elementToFrequencyMap[sortedMainMcPartVect[i]]++;
+            //int size = elementToFrequencyMap.size(); 
+            mainMcParticle = std::max_element(std::begin(elementToFrequencyMap), std::end(elementToFrequencyMap), mapValueComparison)->first;
+            int mainMcParticleFrequency = std::max_element(std::begin(elementToFrequencyMap), std::end(elementToFrequencyMap), mapValueComparison)->second;
+
+//            std::sort(sortedMainMcPartVect.begin(), sortedMainMcPartVect.end(), frequencysort);
+ //           mainMcParticle=sortedMainMcPartVect.at(0);
+            
+            std::cout << "MainMcParticle = " << mainMcParticle << " frequency = " << mainMcParticleFrequency << " total: " << sortedMainMcPartVect.size() << std::endl;
+            //std::cout << "pfoId = " << pfoId << " Write to tree = " << m_writeToTree << " drawProfiles = " << m_drawProfiles << std::endl;
+            MCParticleVector mcParticleVector;
+            for (const MCParticle *pMCParticle : *pMCParticleList) //maybe move this outside pfo loop?
+                 mcParticleVector.push_back(pMCParticle);
+
+            mainMcParticleEnergy= mcParticleVector.at(mainMcParticle)->GetEnergy();  //how do we do this in Pandora without using iterators like this?
 
             std::cout << "Observed transverse energy profile " << std::endl;
             if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), transverseProfile, "COLZ");
+
+
             // Observed longitudinal profile
             Histogram observedLongitudinalProfile(101, -0.2, 40.2);
-            const float convertGeVToMeV(1000.f);
-            const float convertCmToX0(1.f / 14.f);
             float clusterEnergyInMeV(0.f);
             for (const CaloHit *const pCaloHit3D : caloHitList3D)
             {
@@ -200,18 +236,86 @@ StatusCode ShowerSplittingAlgorithm::Run()
                 observedLongitudinalProfile.Fill(longitudinalCoordInCm * convertCmToX0, convertADCToMeV * pParentCaloHit->GetInputEnergy());
             }
 
+            std::cout << "mainMcParticleEnergy = " << mainMcParticleEnergy*1000 << " clusterEnergyInMeV = " << clusterEnergyInMeV << std::endl;
             std::cout << "Observed longitudinal energy profile " << std::endl;
             if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedLongitudinalProfile, "");
+
+            //Expected transverse profile
+            //const float showerDepthAtCentroid = (LArPfoHelper::GetVertex(pShowerPfo)->GetPosition() - centroid).GetMagnitude();//Distance between centroid and vertex
+            const float showerDepthAtCentroid = (centroid-axisIntercept).GetMagnitude()*convertCmToX0;//Distance between centroid and vertex
+            //const float showerDepthAtMaximum = std::log(clusterEnergyInMeV/criticalEnergyMeV)/std::log(2);
+            const float showerDepthAtMaximum = std::log(mainMcParticleEnergy*1000/criticalEnergyMeV)/std::log(2);
+            //const float showerDepthAtMaximum = std::log(mainMcParticleEnergy*1000/criticalEnergyMeV)-0.858;
+            //const float showerDepthAtMaximum = std::log(mainMcParticleEnergy*1000/criticalEnergyMeV)-0.5;
+            const float tau = showerDepthAtCentroid / showerDepthAtMaximum;
+            std::cout << "showerDepthAtCentroid = " << showerDepthAtCentroid << " showerDepthAtMaximum = " << showerDepthAtMaximum << " tau = " << tau << std::endl;
+            const float z1 = 0.0251 + 0.00319*std::log(clusterEnergyInMeV);
+            const float z2 = 0.1162 - 0.000381*atomicNumberArgon;
+            const float k1 = 0.659 - 0.00309*atomicNumberArgon;
+            const float k2 = 0.645;
+            const float k3 = -2.59;
+            const float k4 = 0.3585 + 0.0421*std::log(clusterEnergyInMeV);
+            const float p1 = 2.632 - 0.00094*atomicNumberArgon;
+            const float p2 = 0.401 + 0.00187*atomicNumberArgon;
+            const float p3 = 1.313 - 0.0686*std::log(clusterEnergyInMeV);
+            const float Rc = z1+ z2*tau;
+            const float Rt = k1*(std::exp(k3*(tau-k2))+std::exp(k4*(tau-k2)));
+            const float prob = p1*std::exp((p2-tau)/p3 - std::exp((p2-tau)/p3));
+        
+            float radius(0.f), xDist(0.f), yDist(0.f), profile(0.f);
+            //std::cout << "expectedTransverseProfile.GetNBinsX() = " << expectedTransverseProfile.GetNBinsX() << " nTransverseProfileBins = " << nTransverseProfileBins << std::endl;
+            for(int iBin = 0; iBin < expectedTransverseProfile.GetNBinsX(); ++iBin)
+            {
+                for(int jBin = 0; jBin < expectedTransverseProfile.GetNBinsX(); ++jBin)
+                {   
+                    //std::cout << "deb1" << std::endl;
+                    xDist = transverseProfileMin+iBin*expectedTransverseProfile.GetXBinWidth(); 
+                    //std::cout << "deb2" << std::endl;
+                    yDist = transverseProfileMin+jBin*expectedTransverseProfile.GetXBinWidth();   
+                    //std::cout << "deb3" << std::endl;
+                    radius=std::sqrt(xDist*xDist+yDist*yDist);
+                    //std::cout << "deb4" << std::endl;
+                    profile = 2*radius*(prob*Rc*Rc/std::pow((radius*radius+Rc*Rc),2)+(1-prob)*Rt*Rt/std::pow((radius*radius+Rt*Rt),2)); 
+                    //std::cout << "deb5" << std::endl;
+                    expectedTransverseProfile.SetBinContent(iBin,jBin,profile);
+                    //std::cout << "deb6" << std::endl;
+                    //std::cout << "iBin = " << iBin << " jBin = " << jBin << " xDist = " << xDist << " yDist = " << yDist << " radius = " << radius << " profile = " << profile << std::endl;
+                }
+            }
+            
+            //Fill vectors with expected tranvserse profile in bins of radius
+            for(int iBin = 0; iBin < expectedTransverseProfile.GetNBinsX(); ++iBin){
+                    radius = std::sqrt(2)*(transverseProfileMin+iBin*expectedTransverseProfile.GetXBinWidth());   
+                    profile = 2*radius*(prob*Rc*Rc/std::pow((radius*radius+Rc*Rc),2)+(1-prob)*Rt*Rt/std::pow((radius*radius+Rt*Rt),2)); 
+                    expectedTransverseProfileVect.push_back(profile); 
+                    expectedTransverseProfileRadiusVect.push_back(radius);
+            }
+
+            if(m_writeToTree){
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "pfoId", pfoId);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position1", &position1Vect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "position2", &position2Vect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "energy", &energyVect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "mainMcParticle", &mainMcPartVect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "expectedTransverseProfileRadius", &expectedTransverseProfileRadiusVect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "expectedTransverseProfile", &expectedTransverseProfileVect);
+                PandoraMonitoringApi::SetTreeVariable(this->GetPandora(), m_treeName.c_str(), "expectedTransverseProfileRadius", &expectedTransverseProfileRadiusVect);
+                PandoraMonitoringApi::FillTree(this->GetPandora(), m_treeName.c_str());
+            }
+
+
+            float maximumExpectedTransverseProfile(0.f);
+            int maximumExpectedTransverseProfileBinX(0);
+            int maximumExpectedTransverseProfileBinY(0);
+            expectedTransverseProfile.GetMaximum( maximumExpectedTransverseProfile,maximumExpectedTransverseProfileBinX,maximumExpectedTransverseProfileBinY);
+            expectedTransverseProfile.Scale(1/maximumExpectedTransverseProfile);
+            if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), expectedTransverseProfile, "COLZ");
 
             // Expected longitudinal profile
             Histogram expectedLongitudinalProfile(101, -0.2, 40.2);
 
-            const float clusterEnergyInGeV(clusterEnergyInMeV / convertGeVToMeV);
-            const float longProfileCriticalEnergy(0.08f);
-            const float longProfileParameter0(1.25f);
-            const float longProfileParameter1(0.5f);
-            const float longProfileMaxDifference(0.1f);
 
+            const float clusterEnergyInGeV(clusterEnergyInMeV / convertGeVToMeV);
             const double a(longProfileParameter0 + longProfileParameter1 * std::log(clusterEnergyInGeV / longProfileCriticalEnergy));
             const double gammaA(std::exp(lgamma(a)));
             float t(0.f);
