@@ -42,6 +42,8 @@ private:
      */
     float GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm);
 
+    float GetFigureOfMerit(pandora::CaloHitList caloHitList3D);
+
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
