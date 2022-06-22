@@ -37,14 +37,20 @@ SplitMergedShowersAlgorithm::~SplitMergedShowersAlgorithm()
 
 StatusCode SplitMergedShowersAlgorithm::Run()
 {
+    PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+
     // Get shower pfos and then find the 3D cluster in the shower pfo.
     const PfoList *pShowerPfoList(nullptr);
     if ((STATUS_CODE_SUCCESS == PandoraContentApi::GetList(*this, "ShowerParticles3D", pShowerPfoList)) && pShowerPfoList)
     {
         for (const Pfo *const pShowerPfo : *pShowerPfoList)
         {
+            std::cout << "SplitMergedShowersAlgorithm deb1" << std::endl;
             ClusterList clusterList3D;
             LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
+
+            if(!this->PassesCutsForReclustering(pShowerPfo)) continue; // this just checks it's a shower at the moment
+            std::cout << "SplitMergedShowersAlgorithm deb2" << std::endl;
 
             // Get the longitudinal and transverse shower profiles
             if (clusterList3D.empty())
@@ -61,18 +67,39 @@ StatusCode SplitMergedShowersAlgorithm::Run()
 
             //Now let's free the hits in this cluster, so that they are available for reclustering!
             //ask to remove the 3D cluster from the parent pfo, so that it's not owned any more
-            //ClusterToPfoMap &clusterToPfoMap;
-            //const Pfo *const pPfo(clusterToPfoMap.at(pCluster3D));
             PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RemoveFromPfo(*this, pShowerPfo, clusterList3D.front()));
             //pop this cluster in a local clusterlist
-            ClusterList tmpClusterList;
-            tmpClusterList.push_back(clusterList3D.front());
-            //probably need a local dummy tracklist too
+            const ClusterList reclusterClusterList(1, clusterList3D.front());
+            const TrackList reclusterTrackList; //dummy track list
 
-            //then you'd call InitializeReclustering
+                        
+            // Initialize reclustering with these local lists
+            std::string currentClustersListName;
+            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, currentClustersListName));
+            std::cout << "debug: current list name before reclustering = " << currentClustersListName << std::endl;
+            
+
+            //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
+            const ClusterList *pShowerClusters(nullptr);
+            PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
+            if(pShowerClusters->end() == std::find(pShowerClusters->begin(), pShowerClusters->end(), reclusterClusterList.front())) continue;
+
+            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, "ShowerClusters3D"));
+
+            // Specify clusters and tracks to be used in reclustering
+            std::cout <<  "-------------------------------- INITIALIZE RECLUSTERING ------------------------------------------" << std::endl;
+            std::string originalClustersListName;
+            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::InitializeReclustering(*this, reclusterTrackList, reclusterClusterList, originalClustersListName));
+
+            std::cout <<  "-------------------------------- DONE INITIALIZE RECLUSTERING ------------------------------------------" << std::endl;
+            //Return to the original cluster list
+            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, currentClustersListName));
+
+            // Choose the best recluster candidates, which may still be the originals
+            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndReclustering(*this, originalClustersListName));
+
         }
     }
-
 
     return STATUS_CODE_SUCCESS;
 }
@@ -182,6 +209,12 @@ float SplitMergedShowersAlgorithm::GetFigureOfMerit(CaloHitList caloHitList3D)
     }
     
     return figureOfMerit;
+}
+
+bool SplitMergedShowersAlgorithm::PassesCutsForReclustering(const pandora::ParticleFlowObject *const pShowerPfo)
+{
+    if (LArPfoHelper::IsShower(pShowerPfo)) return true;
+    return false;
 }
 
 StatusCode SplitMergedShowersAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)

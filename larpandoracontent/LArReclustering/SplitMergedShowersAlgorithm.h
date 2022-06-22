@@ -44,6 +44,9 @@ private:
 
     float GetFigureOfMerit(pandora::CaloHitList caloHitList3D);
 
+    //Decide whether to try reclustering for this pfo
+    bool PassesCutsForReclustering(const pandora::ParticleFlowObject *const pPfo);
+
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
