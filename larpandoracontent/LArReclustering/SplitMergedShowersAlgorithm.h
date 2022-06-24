@@ -51,6 +51,8 @@ private:
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
     bool m_drawProfiles; //Boolean to enable and disable displaying transverse profiles
+
+    pandora::StringVector   m_clusteringAlgorithms;                 ///< The ordered list of clustering algorithms to be used
 };
 
 } // namespace lar_content

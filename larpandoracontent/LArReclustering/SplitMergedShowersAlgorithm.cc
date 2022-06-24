@@ -45,12 +45,10 @@ StatusCode SplitMergedShowersAlgorithm::Run()
     {
         for (const Pfo *const pShowerPfo : *pShowerPfoList)
         {
-            std::cout << "SplitMergedShowersAlgorithm deb1" << std::endl;
             ClusterList clusterList3D;
             LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
 
             if(!this->PassesCutsForReclustering(pShowerPfo)) continue; // this just checks it's a shower at the moment
-            std::cout << "SplitMergedShowersAlgorithm deb2" << std::endl;
 
             // Get the longitudinal and transverse shower profiles
             if (clusterList3D.empty())
@@ -87,13 +85,32 @@ StatusCode SplitMergedShowersAlgorithm::Run()
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, "ShowerClusters3D"));
 
             // Specify clusters and tracks to be used in reclustering
-            std::cout <<  "-------------------------------- INITIALIZE RECLUSTERING ------------------------------------------" << std::endl;
             std::string originalClustersListName;
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::InitializeReclustering(*this, reclusterTrackList, reclusterClusterList, originalClustersListName));
 
-            std::cout <<  "-------------------------------- DONE INITIALIZE RECLUSTERING ------------------------------------------" << std::endl;
             //Return to the original cluster list
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, currentClustersListName));
+
+            //Call the reclustering algos that produce new cluster candidates
+            for (StringVector::const_iterator clusteringIter = m_clusteringAlgorithms.begin(), clusteringIterEnd = m_clusteringAlgorithms.end();
+                clusteringIter != clusteringIterEnd; ++clusteringIter)
+            {
+                // Produce new cluster candidates
+                std::string reclusterListName;
+                const ClusterList *pReclusterList = NULL;
+                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RunClusteringAlgorithm(*this, *clusteringIter, 
+                    pReclusterList, reclusterListName));
+   
+                std::cout << "Did I manage to fill the recluster list? size = " << pReclusterList->size() << std::endl; //(Who is actually filling this? the reclustering algo itself doesn't set the current list to have the new clusters in!)
+                
+                if (pReclusterList->empty())
+                    continue;
+    
+                //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RunDaughterAlgorithm(*this, m_associationAlgorithmName));
+                //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RunDaughterAlgorithm(*this, m_trackClusterAssociationAlgName));
+            }
+
+
 
             // Choose the best recluster candidates, which may still be the originals
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndReclustering(*this, originalClustersListName));
@@ -221,6 +238,7 @@ StatusCode SplitMergedShowersAlgorithm::ReadSettings(const TiXmlHandle xmlHandle
 {
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "PfoListName", m_pfoListName));
     PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "DrawProfiles", m_drawProfiles));
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ProcessAlgorithmList(*this, xmlHandle, "clusteringAlgorithms", m_clusteringAlgorithms));
 
     return STATUS_CODE_SUCCESS;
 }

@@ -68,6 +68,8 @@
 
 #include "larpandoracontent/LArPlugins/LArParticleIdPlugins.h"
 
+#include "larpandoracontent/LArReclustering/TransverseCaloReclusteringAlgorithm.h"
+
 #include "larpandoracontent/LArThreeDReco/LArCosmicRay/AmbiguousDeltaRayTool.h"
 #include "larpandoracontent/LArThreeDReco/LArCosmicRay/CosmicRayRemovalTool.h"
 #include "larpandoracontent/LArThreeDReco/LArCosmicRay/CosmicRayShowerMatchingAlgorithm.h"
@@ -324,7 +326,8 @@
     d("LArBdtVertexSelection",                  BdtVertexSelectionAlgorithm)                                                    \
     d("LArSvmVertexSelection",                  SvmVertexSelectionAlgorithm)                                                    \
     d("LArVertexRefinement",                    VertexRefinementAlgorithm)                                                      \
-    d("LArSplitMergedShowers",                  SplitMergedShowersAlgorithm)
+    d("LArSplitMergedShowers",                  SplitMergedShowersAlgorithm)                                                    \
+    d("LArTransverseCaloReclustering",          TransverseCaloReclusteringAlgorithm)                                            
 
 #define LAR_ALGORITHM_TOOL_LIST(d)                                                                                              \
     d("LArBdtBeamParticleId",                   BdtBeamParticleIdTool)                                                          \
