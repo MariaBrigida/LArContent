@@ -76,7 +76,6 @@ StatusCode SplitMergedShowersAlgorithm::Run()
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, currentClustersListName));
             std::cout << "debug: current list name before reclustering = " << currentClustersListName << std::endl;
             
-
             //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
             const ClusterList *pShowerClusters(nullptr);
             PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
@@ -84,12 +83,14 @@ StatusCode SplitMergedShowersAlgorithm::Run()
 
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, "ShowerClusters3D"));
 
+
             // Specify clusters and tracks to be used in reclustering
             std::string originalClustersListName;
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::InitializeReclustering(*this, reclusterTrackList, reclusterClusterList, originalClustersListName));
 
-            //Return to the original cluster list
-            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, currentClustersListName));
+            PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+            PandoraMonitoringApi::VisualizeClusters(this->GetPandora(),&reclusterClusterList, "ClustersToBeReclustered", RED);
+            PandoraMonitoringApi::ViewEvent(this->GetPandora());
 
             //Call the reclustering algos that produce new cluster candidates
             for (StringVector::const_iterator clusteringIter = m_clusteringAlgorithms.begin(), clusteringIterEnd = m_clusteringAlgorithms.end();
@@ -108,11 +109,31 @@ StatusCode SplitMergedShowersAlgorithm::Run()
     
                 //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RunDaughterAlgorithm(*this, m_associationAlgorithmName));
                 //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RunDaughterAlgorithm(*this, m_trackClusterAssociationAlgName));
+
+                PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+                PandoraMonitoringApi::VisualizeClusters(this->GetPandora(),pReclusterList, "ReclusteredClusters", BLUE);
+                PandoraMonitoringApi::ViewEvent(this->GetPandora());
+                
+                //Loop over clusters and calculate new FOMs if they have more than 10 hits
+                
+                for(const Cluster *const pNewCluster : *pReclusterList)
+                {
+                  CaloHitList newClusterCaloHitList3D;
+                  pNewCluster->GetOrderedCaloHitList().FillCaloHitList(newClusterCaloHitList3D);
+
+                  if(newClusterCaloHitList3D.size()<30) continue;
+                  
+                  std::cout << "New figure of merit = " << this->GetFigureOfMerit(newClusterCaloHitList3D) << " nHits = " << newClusterCaloHitList3D.size() << std::endl;                     
+                  PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), &newClusterCaloHitList3D, "newClusterCaloHitList3D", AUTOITER));                 
+                  PandoraMonitoringApi::ViewEvent(this->GetPandora());
+                } 
+
             }
+            //Return to the original cluster list
+            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, currentClustersListName));
 
-
-
-            // Choose the best recluster candidates, which may still be the originals
+            // Choose the best recluster candidates, which may still be the originalsi. Watch out though, because if I chose the reclustered list, this won't contain the track-like clusters that I got rid of by only selecting shower clusters!!!!! Ah no, I don't think it matters, as I've specified the clusters to be re clustered in reclusterClusterList.
+            //I suppose I need to calculate FOM in the loop, then make decision outside, here. How to access the different lists from here?
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndReclustering(*this, originalClustersListName));
 
         }
@@ -142,6 +163,9 @@ float SplitMergedShowersAlgorithm::GetLateralProfileAtShowerMaximum(float cluste
     return profile;
 
 }
+
+
+
 
 float SplitMergedShowersAlgorithm::GetFigureOfMerit(CaloHitList caloHitList3D)
 {
