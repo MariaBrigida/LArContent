@@ -65,7 +65,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
             if (caloHitList3D.size() < 2)
                 throw StatusCodeException(STATUS_CODE_INVALID_PARAMETER);
 
-            float initialFigureOfMerit=this->GetFigureOfMerit(caloHitList3D);
+            float initialFigureOfMerit=this->GetTransverseProfileFigureOfMerit(caloHitList3D);
             //std::cout << "Figure of merit = " << initialFigureOfMerit << std::endl;
 
             //Now let's free the hits in this cluster, so that they are available for reclustering!
@@ -157,7 +157,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                 float mainClusterFraction = (float)newClustersCaloHitLists3D.front().size()/caloHitList3D.size();
                 //std::cout << "mainClusterFraction = " << mainClusterFraction << std::endl;
                 //sortedNewClustersCaloHitLists3D 
-                float newFigureOfMerit = this->GetFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D);
+                float newFigureOfMerit = this->GetTransverseProfileFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D);
                 //std::cout << "Initial figure of merit = " << initialFigureOfMerit << " new figure of merit = " << newFigureOfMerit << std::endl;                     
                 mainClusterFractionVector.push_back(mainClusterFraction);  ///watch out, these are in the loop over many algorithms! if I add more clustering algos I will need to differentiate the entries in these
                 initialFigureOfMeritVector.push_back(initialFigureOfMerit);
@@ -217,7 +217,7 @@ float SplitMergedShowersAlgorithm::GetLateralProfileAtShowerMaximum(float cluste
 
 
 
-float SplitMergedShowersAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
 {
     // Begin with a PCA
     CartesianVector centroid(0.f, 0.f, 0.f);
@@ -284,6 +284,7 @@ float SplitMergedShowersAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCal
         }
         expectedTransverseProfile.Scale(clusterEnergyInMeV/expectedTransverseProfile.GetCumulativeSum());
     }
+
     //Now, if I passed a new set of cluster hit lists in the second argument, I should separately calculate all of their transverse profiles projecting them onto the same plane as merged shower.
     else if(newClustersCaloHitLists3D.size()!=1 and newClustersCaloHitLists3D.at(0)!=mergedClusterCaloHitList3D)
     {
@@ -359,8 +360,76 @@ float SplitMergedShowersAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCal
     return figureOfMerit;
 }
 
+float SplitMergedShowersAlgorithm::GetLongitudinalProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
+{
+    // Begin with a PCA
+    CartesianVector centroid(0.f, 0.f, 0.f);
+    LArPcaHelper::EigenVectors eigenVecs;
+    LArPcaHelper::EigenValues eigenValues(0.f, 0.f, 0.f);
+    LArPcaHelper::RunPca(mergedClusterCaloHitList3D, centroid, eigenValues, eigenVecs);
 
-float SplitMergedShowersAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
+    // By convention, the primary axis has a positive z-component.
+    const CartesianVector axisDirection(eigenVecs.at(0).GetZ() > 0.f ? eigenVecs.at(0) : eigenVecs.at(0) * -1.f);
+
+    // Place intercept at hit with minimum projection
+    float minProjection(std::numeric_limits<float>::max());
+    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
+        minProjection = std::min(minProjection, axisDirection.GetDotProduct(pCaloHit3D->GetPositionVector() - centroid));
+
+    const CartesianVector axisIntercept(centroid + (axisDirection * minProjection));
+
+   // Observed longitudinal profile
+    Histogram observedLongitudinalProfile(140, 0., 140.);
+
+    const float convertADCToMeV(0.0075f); // (c) Maria
+    const float convertGeVToMeV(1000.f);
+    const float convertCmToX0(1.f / 14.f);
+    float clusterEnergyInMeV(0.f);
+
+    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
+    {
+        const CaloHit *const pParentCaloHit(static_cast<const CaloHit *>(pCaloHit3D->GetParentAddress()));
+
+        if (TPC_VIEW_W != pParentCaloHit->GetHitType())
+            continue;
+
+        clusterEnergyInMeV += convertADCToMeV * pParentCaloHit->GetInputEnergy(); // Used later on
+
+        const float longitudinalCoordInCm((pCaloHit3D->GetPositionVector() - axisIntercept).GetDotProduct(axisDirection));
+        observedLongitudinalProfile.Fill(longitudinalCoordInCm * convertCmToX0, convertADCToMeV * pParentCaloHit->GetInputEnergy());
+    }
+
+    std::cout << "Observed longitudinal energy profile " << std::endl;
+    if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedLongitudinalProfile, "");
+
+    // Expected longitudinal profile
+    Histogram expectedLongitudinalProfile(140, 0., 140.);
+
+    const float clusterEnergyInGeV(clusterEnergyInMeV / convertGeVToMeV);
+    const float longProfileCriticalEnergy(0.08f);
+    const float longProfileParameter0(1.25f);
+    const float longProfileParameter1(0.5f);
+
+    const double a(longProfileParameter0 + longProfileParameter1 * std::log(clusterEnergyInGeV / longProfileCriticalEnergy));
+    const double gammaA(std::exp(lgamma(a)));
+
+    float t(0.f);
+    for (int iBin = 0; iBin < expectedLongitudinalProfile.GetNBinsX(); ++iBin)
+    {
+        t += expectedLongitudinalProfile.GetXBinWidth();
+        expectedLongitudinalProfile.Fill(t, convertGeVToMeV * clusterEnergyInGeV / 2. * std::pow(t / 2.f, static_cast<float>(a - 1.)) *
+            std::exp(-t / 2.) * expectedLongitudinalProfile.GetXBinWidth() / gammaA);
+    }
+
+    std::cout << "Expected longitudinal energy profile " << std::endl;
+    if(m_drawProfiles) PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), expectedLongitudinalProfile, "");
+
+    return 1; //placeholder for fom
+
+}
+
+
+float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
 {
     // Begin with a PCA
     CartesianVector centroid(0.f, 0.f, 0.f);
