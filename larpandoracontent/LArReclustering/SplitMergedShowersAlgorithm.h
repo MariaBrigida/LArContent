@@ -42,10 +42,21 @@ private:
      */
     float GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm);
 
-    float GetFigureOfMerit(pandora::CaloHitList caloHitList3D);
+    float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
+
+    /** 
+     *  @brief Use this to find FOM by comparing to prediction produced as combination of a list of underlying clusters
+     * @param Merged cluster hit list
+     * @param Reclustered clusters hit lists vector
+
+     * @return The figure of merit
+     */
+    float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
 
     //Decide whether to try reclustering for this pfo
     bool PassesCutsForReclustering(const pandora::ParticleFlowObject *const pPfo);
+
+    //bool sortByCaloHits (pandora::CaloHitList a, pandora::CaloHitList b);
 
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 

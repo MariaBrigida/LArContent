@@ -29,6 +29,7 @@ private:
     int GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit);
 
     std::string m_mcParticleListName; ///< The mc particle list name 
+    bool m_drawProfiles; //Boolean to enable and disable displaying transverse profiles
 };
 
 } // namespace lar_content

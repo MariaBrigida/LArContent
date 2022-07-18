@@ -50,10 +50,12 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
 
 
     ClusterVector clusterVector;
-
-    PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
-    PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), pCaloHitList, "CurrentClusterHits", BLUE));
-    PandoraMonitoringApi::ViewEvent(this->GetPandora());
+    if(m_drawProfiles)
+    {
+        PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
+        PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), pCaloHitList, "CurrentClusterHits", BLUE));
+        PandoraMonitoringApi::ViewEvent(this->GetPandora());
+    }
 
     
     for (const CaloHit *const pCaloHit : *pCaloHitList)
@@ -105,17 +107,17 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
 
     }
 
-    std::cout << "At the end of the reclustering algorithm, clusterVector has size = " << clusterVector.size() << std::endl;
+    //std::cout << "At the end of the reclustering algorithm, clusterVector has size = " << clusterVector.size() << std::endl;
     //Now I want to display all of these new clusters!
 
-    PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
+    if(m_drawProfiles)PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
     for(const Cluster* pNewCluster: clusterVector)
     { 
       ClusterList newClusters;
       newClusters.push_back(pNewCluster);  
-      PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &newClusters, "newClusters", AUTOITER));
+      if(m_drawProfiles)PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &newClusters, "newClusters", AUTOITER));
     }
-    PandoraMonitoringApi::ViewEvent(this->GetPandora());
+    if(m_drawProfiles)PandoraMonitoringApi::ViewEvent(this->GetPandora());
 
     return STATUS_CODE_SUCCESS;
 }
@@ -148,6 +150,7 @@ int TransverseCaloReclusteringAlgorithm::GetMainMcParticleIndex(const pandora::C
 
 StatusCode TransverseCaloReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
+    PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "DrawProfiles", m_drawProfiles));
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "MCParticleListName", m_mcParticleListName));
     return STATUS_CODE_SUCCESS;
 }
