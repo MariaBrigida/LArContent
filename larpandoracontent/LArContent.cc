@@ -29,6 +29,7 @@
 #include "larpandoracontent/LArCheating/CheatingPfoCreationAlgorithm.h"
 #include "larpandoracontent/LArCheating/CheatingVertexCreationAlgorithm.h"
 #include "larpandoracontent/LArCheating/CheatingVertexSelectionAlgorithm.h"
+#include "larpandoracontent/LArCheating/MyCheatingVertexSelectionAlgorithm.h"
 
 #include "larpandoracontent/LArControlFlow/BdtBeamParticleIdTool.h"
 #include "larpandoracontent/LArControlFlow/BeamParticleIdTool.h"
@@ -237,6 +238,7 @@
     d("LArCheatingPfoCreation",                 CheatingPfoCreationAlgorithm)                                                   \
     d("LArCheatingCosmicRayRemoval",            CheatingCosmicRayRemovalAlgorithm)                                              \
     d("LArCheatingVertexCreation",              CheatingVertexCreationAlgorithm)                                                \
+    d("LArMyCheatingVertexSelection",           MyCheatingVertexSelectionAlgorithm)                                             \
     d("LArCheatingVertexSelection",             CheatingVertexSelectionAlgorithm)                                               \
     d("LArPcaShowerParticleBuilding",           PcaShowerParticleBuildingAlgorithm)                                             \
     d("LArMaster",                              MasterAlgorithm)                                                                \
