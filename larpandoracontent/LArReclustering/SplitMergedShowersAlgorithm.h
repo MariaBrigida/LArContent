@@ -42,11 +42,16 @@ private:
      */
     float GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm);
 
+    /** 
+     *  @brief Use this to find FOM by comparing observed transverse profiles to prediction for one shower
+     * @param Merged cluster hit list
+     * @return The figure of merit
+     */
     float GetTransverseProfileFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
     float GetLongitudinalProfileFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
 
     /** 
-     *  @brief Use this to find FOM by comparing to prediction produced as combination of a list of underlying clusters
+     *  @brief Use this to find FOM by comparing observed transverse profile (merged) to prediction produced as combination of a list of underlying clusters
      * @param Merged cluster hit list
      * @param Reclustered clusters hit lists vector
 
@@ -54,17 +59,16 @@ private:
      */
     float GetTransverseProfileFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitList3D); //Eventually, perhaps move each of these in its own class, and let choose which ones to calculate via XML, like the clustering algos themselves
 
+
     //Decide whether to try reclustering for this pfo
     bool PassesCutsForReclustering(const pandora::ParticleFlowObject *const pPfo);
-
-    //bool sortByCaloHits (pandora::CaloHitList a, pandora::CaloHitList b);
 
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
     bool m_drawProfiles; //Boolean to enable and disable displaying transverse profiles
 
-    pandora::StringVector   m_clusteringAlgorithms;                 ///< The ordered list of clustering algorithms to be used
+    pandora::StringVector   m_clusteringAlgorithms; ///< The ordered list of clustering algorithms to be used
 };
 
 } // namespace lar_content

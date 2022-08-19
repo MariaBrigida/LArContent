@@ -46,6 +46,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
     // Get shower pfos and then find the 3D cluster in the shower pfo.
     const PfoList *pShowerPfoList(nullptr);
     std::string initialPfosListName, initialVertexListName;
+    std::string daughterVertexListName="DaughterVertices3D";
     std::string newPfosListNameAllAfterReclustering = "newShowerParticles3D";
     std::string newVertexListNameAllAfterReclustering = "newVertices";
     std::string newPfoListName = "changedShowerParticles3D";
@@ -54,6 +55,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
     if ((STATUS_CODE_SUCCESS == PandoraContentApi::GetList(*this, "ShowerParticles3D", pShowerPfoList)) && pShowerPfoList)
     {
         std::cout << "In this event there are " << pShowerPfoList->size() << " shower pfos." << std::endl;
+        if (pShowerPfoList->size()==0) return STATUS_CODE_NOT_FOUND;
         PfoList unchangedPfoList;   
         VertexList unchangedVertexList;   
         std::vector<float> mainClusterFractionVector, initialFigureOfMeritVector, newFigureOfMeritVector, nHitsInitialFomVector, nFinalClustersVector;
@@ -65,12 +67,22 @@ StatusCode SplitMergedShowersAlgorithm::Run()
         for (const Pfo *const pShowerPfo : *pShowerPfoList)
         {
             std::cout << "iPfo = " << iPfo << std::endl;
+
+            if(m_drawProfiles)
+            {
+                PfoList pfoToVisualize;
+                pfoToVisualize.push_back(pShowerPfo);
+                PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+                PandoraMonitoringApi::VisualizeParticleFlowObjects(this->GetPandora(),&pfoToVisualize, "PfoToVisualize", RED);
+                PandoraMonitoringApi::ViewEvent(this->GetPandora());
+            }
+
             const PfoList *pNewPfoList(nullptr);
             const VertexList *pNewVertexList(nullptr);
             ClusterList clusterList3D;
             LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
 
-            if(!this->PassesCutsForReclustering(pShowerPfo)) continue; // this just checks it's a shower at the moment
+            if(!this->PassesCutsForReclustering(pShowerPfo)) continue; // this function just checks it's a shower at the moment
 
             // Get the longitudinal and transverse shower profiles
             if (clusterList3D.empty())
@@ -90,12 +102,12 @@ StatusCode SplitMergedShowersAlgorithm::Run()
 
 
             float initialFigureOfMerit=this->GetTransverseProfileFigureOfMerit(caloHitList3D);
-            //std::cout << "Figure of merit = " << initialFigureOfMerit << std::endl;
 
-            //Now let's free the hits in this cluster, so that they are available for reclustering!
-            //ask to remove the 3D cluster from the parent pfo, so that it's not owned any more
+            //Free the hits in this cluster, so that they are available for reclustering!
+            //Ask to remove the 3D cluster from the parent pfo, so that it's not owned any more
             PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RemoveFromPfo(*this, pShowerPfo, clusterList3D.front()));
-            //pop this cluster in a local clusterlist
+
+            //Pop this cluster in a local clusterlist
             const ClusterList reclusterClusterList(1, clusterList3D.front());
             const TrackList reclusterTrackList; //dummy track list
 
@@ -106,8 +118,6 @@ StatusCode SplitMergedShowersAlgorithm::Run()
             // Initialize reclustering with these local lists
             std::string currentClustersListName;
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, currentClustersListName));
-            
-
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, "ShowerClusters3D"));
 
 
@@ -121,8 +131,8 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                 PandoraMonitoringApi::VisualizeClusters(this->GetPandora(),&reclusterClusterList, "ClustersToBeReclustered", RED);
                 PandoraMonitoringApi::ViewEvent(this->GetPandora());
             }
-            //Call the reclustering algos that produce new cluster candidates
 
+            //Call the reclustering algos that produce new cluster candidates
             float minimumFigureOfMerit(initialFigureOfMerit);
             ClusterList minimumFigureOfMeritClusterList = clusterList3D;
             const ClusterList *pReclusterList = NULL;
@@ -147,8 +157,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
 
                 
                 //Loop over clusters and calculate new FOM including them if they have more than 10 hits
-                
-                std::vector<CaloHitList> newClustersCaloHitLists3D;  //I'm doing this because the function calls for two arguments, but I am essentially passing it the same input in both
+                std::vector<CaloHitList> newClustersCaloHitLists3D;
                 for(const Cluster *const pNewCluster : *pReclusterList)
                 {
                   CaloHitList newClusterCaloHitList3D;
@@ -168,14 +177,15 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                 std::sort (newClustersCaloHitLists3D.begin(), newClustersCaloHitLists3D.end(), sortByCaloHits);
                 if(!newClustersCaloHitLists3D.size()) continue; 
                 float mainClusterFraction = (float)newClustersCaloHitLists3D.front().size()/caloHitList3D.size();
-                //std::cout << "mainClusterFraction = " << mainClusterFraction << std::endl;
-                float newFigureOfMerit = this->GetTransverseProfileFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D);
+                float newFigureOfMerit = this->GetTransverseProfileFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D); //I am also passing original caloHitList3D as the FOM uses the original PCA calculations
                 mainClusterFractionVector.push_back(mainClusterFraction);  ///watch out, these are in the loop over many algorithms! if I add more clustering algos I will need to differentiate the entries in these
+
+                //Will print these for study/debug purposes
                 initialFigureOfMeritVector.push_back(initialFigureOfMerit);
                 newFigureOfMeritVector.push_back(newFigureOfMerit);
                 nHitsInitialFomVector.push_back(caloHitList3D.size());
                 nFinalClustersVector.push_back(newClustersCaloHitLists3D.size());
-                //std::cout << "minimumFigureOfMerit = " << minimumFigureOfMerit << " newFigureOfMerit = " << newFigureOfMerit << std::endl; 
+
                 if(newFigureOfMerit<minimumFigureOfMerit)
                 {
                     minimumFigureOfMerit=newFigureOfMerit;
@@ -183,11 +193,10 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                 }
             }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
            if(minimumFigureOfMeritClusterList==clusterList3D)
            {
-               std::cout << "NO CHANGE!" << std::endl;
+               //std::cout << "NO CHANGE!" << std::endl;
                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::AddToPfo(*this, pShowerPfo, clusterList3D.front()));
                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::AddToPfo(*this, pShowerPfo, pInitialVertex));
                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndReclustering(*this, originalClustersListName));
@@ -197,7 +206,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
            }
            else
            {
-               std::cout << "THE CLUSTER LIST CHANGED! I need to make " << minimumFigureOfMeritClusterList.size() << " new pfos." << std::endl;
+               //std::cout << "THE CLUSTER LIST CHANGED! I need to make " << minimumFigureOfMeritClusterList.size() << " new pfos." << std::endl;
                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndReclustering(*this, reclusterListName));
 
 
@@ -218,9 +227,6 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, initialListName));
                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, clusterListName));
                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, debugListName));
-
-
-
 
                    // Fragmentation initialisation
                    std::string originalListName, fragmentListName;
@@ -244,7 +250,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                                for (const CaloHit *const pCaloHit : *mapEntry.second)
                                {
                                    if(pCaloHit==static_cast<const CaloHit *>(p3DCaloHit->GetParentAddress())) 
-                                   {parameters.m_caloHitList.push_back(static_cast<const CaloHit *>(pCaloHit));/*std::cout << "added a hit!" << std::endl;*/}
+                                   {parameters.m_caloHitList.push_back(static_cast<const CaloHit *>(pCaloHit));}
                                }
                            }
                        }
@@ -261,24 +267,17 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                        else if(hitType==TPC_VIEW_W) newClustersWVect.push_back(pNewTwoDCluster);
                        iCluster++;
                    }
-
                    
                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndFragmentation(*this, fragmentListName, originalListName));
-
                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, initialListName));
 
                }
                
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::CreateTemporaryListAndSetCurrent(*this, pNewPfoList, newPfoListName));
+               PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::CreateTemporaryListAndSetCurrent(*this, pNewPfoList, newPfoListName));
+               PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::CreateTemporaryListAndSetCurrent(*this, pNewVertexList, newVertexListName));
 
-
-                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::CreateTemporaryListAndSetCurrent(*this, pNewVertexList, newVertexListName));
-
-
-
-                std::string originalClusterListName="InitialCluster";
+               std::string originalClusterListName="InitialCluster";
                int iCluster(0);
-               std::cout << "I need to create " << minimumFigureOfMeritClusterList.size() << " new pfos for this pfo" << std::endl;
                for(const Cluster *const pNewThreeDCluster : minimumFigureOfMeritClusterList)
                {
 
@@ -303,8 +302,6 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                        vertexParameters.m_vertexType = VERTEX_3D;
                        const Vertex *pNewVertex(nullptr);
                        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::Vertex::Create(*this, vertexParameters, pNewVertex));
-
-//                     PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::AddToPfo<Vertex>(*this, pPfo, pVertex));
                        pfoParameters.m_vertexList.push_back(pNewVertex); //For now, using the input shower pfo vertex list (but will need modifying)
 
 
@@ -327,24 +324,30 @@ StatusCode SplitMergedShowersAlgorithm::Run()
                  
             }
             iPfo++;
+
+            if(m_drawProfiles && pNewPfoList->size()>0)
+            {
+                PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
+                PandoraMonitoringApi::VisualizeParticleFlowObjects(this->GetPandora(),pNewPfoList, "PfosToVisualizeAfter", RED);
+                PandoraMonitoringApi::ViewEvent(this->GetPandora());
+            }
+
         }
 
-        std::cout << "The original list had " << pShowerPfoList->size() << " pfos in it. unchangedPfoList.size() = " << unchangedPfoList.size() << std::endl;
         if(unchangedPfoList.size()>0) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<PfoList>(*this, "ShowerParticles3D", newPfosListNameAllAfterReclustering,  unchangedPfoList));
-        if(unchangedVertexList.size()>0) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<VertexList>(*this, initialVertexListName, newVertexListNameAllAfterReclustering,  unchangedVertexList));
-        std::cout << "Now it has " << pShowerPfoList->size() << " pfos in it." << std::endl;
+
+        //DEBUGGING ONLY
+        //const VertexList *pInitialVertexList;
+        //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<VertexList>(*this, daughterVertexListName, pInitialVertexList));
+        //std::cout << "initialVertexListName = " << initialVertexListName << "pInitialVertexList size = " << pInitialVertexList->size() << std::endl;
+
+        if(unchangedVertexList.size()>0) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<VertexList>(*this, daughterVertexListName, newVertexListNameAllAfterReclustering,  unchangedVertexList));
         const PfoList *pNewPfosListAllAfterReclustering;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, newPfosListNameAllAfterReclustering, pNewPfosListAllAfterReclustering));
-        //if(unchangedPfoList.size()) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, newPfosListNameAllAfterReclustering,  "ShowerParticles3D"));
-        std::cout <<"Total " << pNewPfosListAllAfterReclustering->size() << " pfos after reclustering." << std::endl;;  
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, newPfosListNameAllAfterReclustering, "ShowerParticles3D"));
-        PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Vertex>(*this, newVertexListNameAllAfterReclustering, initialVertexListName));
+        PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Vertex>(*this, newVertexListNameAllAfterReclustering, daughterVertexListName));
         const PfoList *pShowerParticles3DDebug;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, "ShowerParticles3D", pShowerParticles3DDebug));
-        std::cout << "And I have now renamed these to ShowerParticles3D again, so should get the same number: " << pShowerParticles3DDebug->size() << std::endl;
-        //const PfoList *pNewPfosListAllAfterReclustering;
-        //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, "ShowerParticles3D", pNewPfosListAllAfterReclustering));
-        //std::cout <<"In this event there were " << unchangedPfoList.size() << "unchanged pfos. A total new " << pNewPfosListAllAfterReclustering->size() << " pfos after reclustering." << std::endl;;  
 
         for(long unsigned int iFom=0; iFom<newFigureOfMeritVector.size(); iFom++)
         {
@@ -353,16 +356,6 @@ StatusCode SplitMergedShowersAlgorithm::Run()
 
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Pfo>(*this, initialPfosListName));
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Vertex>(*this, initialVertexListName));
-
-        //ONLY FOR DEBUG PURPOSES
-        bool debugInfo(true);
-        if(debugInfo)
-        {
-            const PfoList *pDebugList(nullptr);
-            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, "ShowerParticles3D", pDebugList));
-            std::cout << "ShowerParticles3D list size = " << pShowerPfoList->size() << std::endl;
-        }
-
 
     }
 
@@ -481,7 +474,6 @@ float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
                 newObservedTransverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
                 clusterEnergy+=pCaloHit3D->GetInputEnergy();
             }
-            //newObservedTransverseProfiles.push_back(newObservedTransverseProfile);
             if(m_drawProfiles)
             { 
                 PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), newObservedTransverseProfile, "COLZ");
@@ -652,7 +644,6 @@ float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     }
 
     //Scale observed profile to total cluster energy
-    //std::cout << "clusterEnergyInMeV = " << clusterEnergyInMeV << " observedTransverseProfile.GetCumulativeSum() = " << observedTransverseProfile.GetCumulativeSum() << std::endl;
     observedTransverseProfile.Scale(clusterEnergyInMeV/observedTransverseProfile.GetCumulativeSum());
 
 
@@ -679,7 +670,6 @@ float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
         for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
         {
           float diff = expectedTransverseProfile.GetBinContent(iBinX, iBinY)-observedTransverseProfile.GetBinContent(iBinX,iBinY);
-          //std::cout << "diff = " << diff << " obs = " << observedTransverseProfile.GetBinContent(iBinX,iBinY) << " exp = " << expectedTransverseProfile.GetBinContent(iBinX,iBinY) << std::endl;
           float squaredDiff = diff*diff;     
           squaredDiffSum+=squaredDiff;
         }
