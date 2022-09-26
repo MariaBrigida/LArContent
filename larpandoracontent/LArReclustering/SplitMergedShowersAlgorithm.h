@@ -43,6 +43,15 @@ private:
     float GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm);
 
     /** 
+     *  @brief Use this to find cheated FOM by finding the shower purity as the fraction of hits that the main Mc particle is contributing to
+     * @param Merged cluster hit list
+     * @return The figure of merit
+     */
+    float GetCheatedFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
+    
+    float GetCheatedFigureOfMerit(std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
+
+    /** 
      *  @brief Use this to find FOM by comparing observed transverse profiles to prediction for one shower
      * @param Merged cluster hit list
      * @return The figure of merit
@@ -63,12 +72,16 @@ private:
     //Decide whether to try reclustering for this pfo
     bool PassesCutsForReclustering(const pandora::ParticleFlowObject *const pPfo);
 
+    int GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit);
+    int GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle);
+
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
     bool m_drawProfiles; //Boolean to enable and disable displaying transverse profiles
-
+    int m_hitThresholdForNewPfo; //Minimum nr. of hits to form new 3Dcluster and pfo
     pandora::StringVector   m_clusteringAlgorithms; ///< The ordered list of clustering algorithms to be used
+    std::string m_mcParticleListName; ///< The mc particle list name 
 };
 
 } // namespace lar_content
