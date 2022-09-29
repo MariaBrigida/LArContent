@@ -1,5 +1,5 @@
 /**
- *  @file   larpandoracontent/LArReclustering/TransverseCaloReclusteringAlgorithm.cc
+ *  @file   larpandoracontent/LArReclustering/CheatedThreeDClusteringAlgorithm.cc
  *
  *  @brief  Implementation file for the reclustering algorithm that uses transverse calorimetric profiles.
  *
@@ -13,7 +13,7 @@
 #include "larpandoracontent/LArHelpers/LArPcaHelper.h"
 #include "larpandoracontent/LArHelpers/LArMCParticleHelper.h"
 
-#include "larpandoracontent/LArReclustering/TransverseCaloReclusteringAlgorithm.h"
+#include "larpandoracontent/LArReclustering/CheatedThreeDClusteringAlgorithm.h"
 
 
 using namespace pandora;
@@ -21,11 +21,11 @@ using namespace pandora;
 namespace lar_content
 {
 
-TransverseCaloReclusteringAlgorithm::TransverseCaloReclusteringAlgorithm()
+CheatedThreeDClusteringAlgorithm::CheatedThreeDClusteringAlgorithm()
 {
 }
 
-StatusCode TransverseCaloReclusteringAlgorithm::Run()
+StatusCode CheatedThreeDClusteringAlgorithm::Run()
 {
 
     //Access the clusters
@@ -103,7 +103,7 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
 }
 
 //Get vector of MC particles, sort them, loop into the vector and find in map (see "SortMCParticle")
-int TransverseCaloReclusteringAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit)
+int CheatedThreeDClusteringAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit)
 {
     const MCParticleList *pMCParticleList(nullptr);
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_mcParticleListName, pMCParticleList));
@@ -126,7 +126,7 @@ int TransverseCaloReclusteringAlgorithm::GetMainMcParticleIndex(const pandora::C
 }
 
 
-StatusCode TransverseCaloReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
+StatusCode CheatedThreeDClusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
     PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "DrawProfiles", m_drawProfiles));
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "MCParticleListName", m_mcParticleListName));

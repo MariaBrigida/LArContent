@@ -1,13 +1,13 @@
 /**
- *  @file   larpandoracontent/LArReclustering/TransverseCaloReclusteringAlgorithm.h
+ *  @file   larpandoracontent/LArReclustering/CheatedThreeDClusteringAlgorithm.h
  *
  *  @brief  Header file for the reclustering algorithm that uses transverse calorimetric profiles.
  *
  *  $Log: $
  */
 
-#ifndef LAR_TRANSVERSE_CALO_RECLUSTERING_ALGORITHM_H
-#define LAR_TRANSVERSE_CALO_RECLUSTERING_ALGORITHM_H 1
+#ifndef LAR_CHEATED_THREE_D_CLUSTERING_ALGORITHM_H
+#define LAR_CHEATED_THREE_D_CLUSTERING_ALGORITHM_H 1
 
 #include "Pandora/Algorithm.h"
 
@@ -16,11 +16,11 @@ namespace lar_content
 /**
  *  @brief  RecursivePfoMopUpAlgorithm class
  */
-class TransverseCaloReclusteringAlgorithm : public pandora::Algorithm
+class CheatedThreeDClusteringAlgorithm : public pandora::Algorithm
 {
 public:
 
-    TransverseCaloReclusteringAlgorithm();
+    CheatedThreeDClusteringAlgorithm();
 
 private:
 
