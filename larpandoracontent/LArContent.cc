@@ -150,7 +150,7 @@
 #include "larpandoracontent/LArThreeDReco/LArTwoViewMatching/TwoViewThreeDKinkTool.h"
 #include "larpandoracontent/LArThreeDReco/LArTwoViewMatching/TwoViewTransverseTracksAlgorithm.h"
 
-#include "larpandoracontent/LArReclustering/SplitMergedShowersAlgorithm.h"
+#include "larpandoracontent/LArReclustering/ThreeDReclusteringAlgorithm.h"
 
 #include "larpandoracontent/LArVertex/EnergyDepositionAsymmetryFeatureTool.h"
 #include "larpandoracontent/LArVertex/EnergyKickFeatureTool.h"
@@ -326,7 +326,7 @@
     d("LArBdtVertexSelection",                  BdtVertexSelectionAlgorithm)                                                    \
     d("LArSvmVertexSelection",                  SvmVertexSelectionAlgorithm)                                                    \
     d("LArVertexRefinement",                    VertexRefinementAlgorithm)                                                      \
-    d("LArSplitMergedShowers",                  SplitMergedShowersAlgorithm)                                                    \
+    d("LArThreeDReclustering",                  ThreeDReclusteringAlgorithm)                                                    \
     d("LArTransverseCaloReclustering",          TransverseCaloReclusteringAlgorithm)                                            
 
 #define LAR_ALGORITHM_TOOL_LIST(d)                                                                                              \

@@ -1,5 +1,5 @@
 /**
- *  @file   larpandoracontent/LArReclustering/SplitMergedShowersAlgorithm.cc
+ *  @file   larpandoracontent/LArReclustering/ThreeDReclusteringAlgorithm.cc
  *
  *  @brief  Implementation file for the reclustering algorithm that runs other algs.
  *
@@ -14,7 +14,7 @@
 #include "larpandoracontent/LArHelpers/LArPcaHelper.h"
 #include "larpandoracontent/LArHelpers/LArMCParticleHelper.h"
 
-#include "larpandoracontent/LArReclustering/SplitMergedShowersAlgorithm.h"
+#include "larpandoracontent/LArReclustering/ThreeDReclusteringAlgorithm.h"
 
 const float convertADCToMeV = 0.0075;
 const int atomicNumberArgon = 18;
@@ -29,17 +29,17 @@ using namespace pandora;
 namespace lar_content
 {
 
-SplitMergedShowersAlgorithm::SplitMergedShowersAlgorithm():
+ThreeDReclusteringAlgorithm::ThreeDReclusteringAlgorithm():
     m_visualDisplaysOn(false),
     m_hitThresholdForNewPfo(0)
 {
 }
 
-SplitMergedShowersAlgorithm::~SplitMergedShowersAlgorithm()
+ThreeDReclusteringAlgorithm::~ThreeDReclusteringAlgorithm()
 {
 }
 
-StatusCode SplitMergedShowersAlgorithm::Run()
+StatusCode ThreeDReclusteringAlgorithm::Run()
 {
     std::cout << "--------------------------------------------- NEW EVENT ------------------------------------------------" << std::endl;
     if(m_visualDisplaysOn)PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
@@ -403,7 +403,7 @@ StatusCode SplitMergedShowersAlgorithm::Run()
 }
 
 //Lateral profile at the shower maximum
-float SplitMergedShowersAlgorithm::GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm){
+float ThreeDReclusteringAlgorithm::GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm){
     const float tau=1; //shower maximum
     float energy=clusterEnergyInMeV/criticalEnergyArgon;
     float radius=radiusInCm/moliereRadiusCmArgon;
@@ -425,7 +425,7 @@ float SplitMergedShowersAlgorithm::GetLateralProfileAtShowerMaximum(float cluste
 }
 
 
-float SplitMergedShowersAlgorithm::GetCheatedFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
+float ThreeDReclusteringAlgorithm::GetCheatedFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
 {
     std::map<int,int> mainMcParticleMap;
     for (const CaloHit *const pCaloHit : mergedClusterCaloHitList3D)
@@ -458,7 +458,7 @@ float SplitMergedShowersAlgorithm::GetCheatedFigureOfMerit(CaloHitList mergedClu
     return mainMcParticleFraction;
 }
 
-int SplitMergedShowersAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit)
+int ThreeDReclusteringAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit)
 {
     const MCParticleList *pMCParticleList(nullptr);
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_mcParticleListName, pMCParticleList));
@@ -481,7 +481,7 @@ int SplitMergedShowersAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *
 
 }
 
-int SplitMergedShowersAlgorithm::GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle)
+int ThreeDReclusteringAlgorithm::GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle)
 {
     MCParticleVector mcParticleHierarchyVector;
     int mcParticleHierarchyTier(0);
@@ -500,7 +500,7 @@ int SplitMergedShowersAlgorithm::GetMCParticleHierarchyTier(const pandora::MCPar
 
 
 
-float SplitMergedShowersAlgorithm::GetCheatedFigureOfMerit(std::vector<CaloHitList> newClustersCaloHitLists3D)
+float ThreeDReclusteringAlgorithm::GetCheatedFigureOfMerit(std::vector<CaloHitList> newClustersCaloHitLists3D)
 {
     float minimumFigureOfMerit(999999);
 
@@ -514,7 +514,7 @@ float SplitMergedShowersAlgorithm::GetCheatedFigureOfMerit(std::vector<CaloHitLi
 }
 
 
-float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
 {
     // Begin with a PCA
     CartesianVector centroid(0.f, 0.f, 0.f);
@@ -653,7 +653,7 @@ float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     return figureOfMerit;
 }
 
-float SplitMergedShowersAlgorithm::GetLongitudinalProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
+float ThreeDReclusteringAlgorithm::GetLongitudinalProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
 {
     // Begin with a PCA
     CartesianVector centroid(0.f, 0.f, 0.f);
@@ -722,7 +722,7 @@ float SplitMergedShowersAlgorithm::GetLongitudinalProfileFigureOfMerit(CaloHitLi
 }
 
 
-float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
+float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
 {
     // Begin with a PCA
     CartesianVector centroid(0.f, 0.f, 0.f);
@@ -810,13 +810,13 @@ float SplitMergedShowersAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     return figureOfMerit;
 }
 
-bool SplitMergedShowersAlgorithm::PassesCutsForReclustering(const pandora::ParticleFlowObject *const pShowerPfo)
+bool ThreeDReclusteringAlgorithm::PassesCutsForReclustering(const pandora::ParticleFlowObject *const pShowerPfo)
 {
     if (LArPfoHelper::IsShower(pShowerPfo)) return true;
     return false;
 }
 
-StatusCode SplitMergedShowersAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
+StatusCode ThreeDReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "PfoListName", m_pfoListName));
     PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "VisualDisplaysOn", m_visualDisplaysOn));

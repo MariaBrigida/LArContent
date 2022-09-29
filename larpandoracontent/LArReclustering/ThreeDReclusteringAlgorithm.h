@@ -1,13 +1,13 @@
 /**
- *  @file   larpandoracontent/LArReclustering/SplitMergedShowersAlgorithm.h
+ *  @file   larpandoracontent/LArReclustering/ThreeDReclusteringAlgorithm.h
  *
  *  @brief  Header file for the reclustering algorithm that runs other algs.
  *
  *  $Log: $
  */
 
-#ifndef LAR_SPLIT_MERGED_SHOWERS_ALGORITHM_H
-#define LAR_SPLIT_MERGED_SHOWERS_ALGORITHM_H 1
+#ifndef LAR_THREE_D_RECLUSTERING_ALGORITHM_H
+#define LAR_THREE_D_RECLUSTERING_ALGORITHM_H 1
 
 #include "Pandora/Algorithm.h"
 
@@ -16,18 +16,18 @@ namespace lar_content
 /**
  *  @brief  RecursivePfoMopUpAlgorithm class
  */
-class SplitMergedShowersAlgorithm : public pandora::Algorithm
+class ThreeDReclusteringAlgorithm : public pandora::Algorithm
 {
 public:
     /**
      *  @brief  Default constructor
      */
-    SplitMergedShowersAlgorithm();
+    ThreeDReclusteringAlgorithm();
 
    /**
     *  @brief  Destructor
     */
-    ~SplitMergedShowersAlgorithm();
+    ~ThreeDReclusteringAlgorithm();
 
 private:
 
@@ -86,4 +86,4 @@ private:
 
 } // namespace lar_content
 
-#endif // #ifndef LAR_SPLIT_MERGED_SHOWERS_ALGORITHM_H
+#endif // #ifndef LAR_THREE_D_RECLUSTERING_ALGORITHM_H
