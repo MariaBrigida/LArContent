@@ -39,15 +39,6 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
     if (pCaloHitList->empty())
         return STATUS_CODE_SUCCESS;
 
-//    OrderedCaloHitList orderedCaloHitList;
-//    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, orderedCaloHitList.Add(*pCaloHitList));
-
-/*    const MCParticleList *pMCParticleList(nullptr);
-    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_mcParticleListName, pMCParticleList));
-
-    MCParticleVector mcParticleVector; 
-    for (const MCParticle *pMCParticle : *pMCParticleList) mcParticleVector.push_back(pMCParticle);*/
-
 
     ClusterVector clusterVector;
     if(m_drawProfiles)
@@ -61,14 +52,11 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
     for (const CaloHit *const pCaloHit : *pCaloHitList)
     {
 
-        //std::cout << "debug calo hit loop. clusterVector.size = " << clusterVector.size() << std::endl;
         const CaloHit *const pParentCaloHit = static_cast<const CaloHit *>(pCaloHit->GetParentAddress());
         //if (TPC_VIEW_W != pParentCaloHit->GetHitType()) 
         //    continue; 
         //Find main contributing MC particle Id 
-        //MCParticleVector mcParticleVector; 
         int mainMcParticleIndex = this->GetMainMcParticleIndex(pParentCaloHit);
-        //std::cout <<"mainMcParticleIndex = " << mainMcParticleIndex << std::endl;
 
 
         //Loop over clusterVector entries
@@ -77,39 +65,31 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
         {
              const Cluster *const pCluster = *cluIter;
              //I only need to check the parent MC particle of one hit in the cluster. I'll take the front 
-             //const OrderedCaloHitList &orderedCaloHitList(pCluster->GetOrderedCaloHitList());
              CaloHitList clusterCaloHitList;;
              pCluster->GetOrderedCaloHitList().FillCaloHitList(clusterCaloHitList);
-             //std::cout << "mainMcParticleIndex = " << mainMcParticleIndex << " this->GetMainMcParticleIndex(clusterCaloHitList.front()) = " << this->GetMainMcParticleIndex(clusterCaloHitList.front()) << std::endl;
              const CaloHit *const pFrontHitParentCaloHit = static_cast<const CaloHit *>(clusterCaloHitList.front()->GetParentAddress());
              if(this->GetMainMcParticleIndex(pFrontHitParentCaloHit)==mainMcParticleIndex) pMainMCParticleCluster=pCluster;
              
         }
 
-        //If pMainMCParticle is null cluster (a cluster with matching MC particle hits is not found), create one
+        //If pMainMCParticle is null (a cluster with matching MC particle hits is not found), create one
         if(!pMainMCParticleCluster)      
         {
-            //std::cout << "debug calo hit loop: cluster with this mc hits index not found. clusterVector.size = " << clusterVector.size() << std::endl;
             const Cluster *pCluster = nullptr;
             PandoraContentApi::Cluster::Parameters parameters;
             parameters.m_caloHitList.push_back(pCaloHit);
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::Cluster::Create(*this, parameters, pCluster));
-            //PandoraContentApi::AddToCluster(const pandora::Algorithm &algorithm, const pandora::Cluster *const pCluster, const T *const pT)
             clusterVector.push_back(pCluster);
         }
         else
         {
             //Attach calo hit to pMainMCParticleCluster
-            //std::cout << "debug calo hit loop: cluster with this mc hits index was found and I will attach hits. clusterVector.size = " << clusterVector.size() << std::endl;
             PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::AddToCluster(*this, pMainMCParticleCluster, pCaloHit));
-            //PandoraContentApi::AddToCluster(const pandora::Algorithm &algorithm, const pandora::Cluster *const pCluster, const T *const pT)
         }
 
     }
 
-    //std::cout << "At the end of the reclustering algorithm, clusterVector has size = " << clusterVector.size() << std::endl;
     //Now I want to display all of these new clusters!
-
     if(m_drawProfiles)PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
     for(const Cluster* pNewCluster: clusterVector)
     { 
@@ -122,24 +102,22 @@ StatusCode TransverseCaloReclusteringAlgorithm::Run()
     return STATUS_CODE_SUCCESS;
 }
 
+//Get vector of MC particles, sort them, loop into the vector and find in map (see "SortMCParticle")
 int TransverseCaloReclusteringAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit)
 {
-    //const CaloHit *const pParentCaloHit(static_cast<const CaloHit *>(pCaloHit->GetParentAddress()));
-
     const MCParticleList *pMCParticleList(nullptr);
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_mcParticleListName, pMCParticleList));
-//    std::cout << "debug pMCParticleList size = " << pMCParticleList->size() << std::endl;
-//    std::cout << "debug pParentCaloHit->GetMCParticleWeightMap() size = " << pParentCaloHit->GetMCParticleWeightMap().size() << std::endl;
-    int /*mcParticleIndex(-999),*/iMcPart(0); 
+    MCParticleVector mcParticleVector(pMCParticleList->begin(),pMCParticleList->end());
+    std::sort(mcParticleVector.begin(), mcParticleVector.end(), LArMCParticleHelper::SortByMomentum);
+    int iMcPart(0); 
     for (const auto &weightMapEntry : pCaloHit->GetMCParticleWeightMap()) 
     { 
       if(weightMapEntry.second>0.5) 
       { 
-//        std::cout << "particle ID = " << weightMapEntry.first << std::endl; 
         iMcPart=0;  
-        for(const MCParticle *const pMCParticle: *pMCParticleList) 
+        for(const MCParticle *const pMCParticle: mcParticleVector) 
         { 
-            if(pMCParticle==weightMapEntry.first) {/*mcParticleIndex=iMcPart;*/ break;} 
+            if(pMCParticle==weightMapEntry.first) { break;} 
             iMcPart++; 
         }
       } 
