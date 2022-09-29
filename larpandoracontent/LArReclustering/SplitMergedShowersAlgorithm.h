@@ -78,7 +78,7 @@ private:
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
-    bool m_drawProfiles; //Boolean to enable and disable displaying transverse profiles
+    bool m_visualDisplaysOn; //Boolean to enable and disable displaying transverse profiles
     int m_hitThresholdForNewPfo; //Minimum nr. of hits to form new 3Dcluster and pfo
     pandora::StringVector   m_clusteringAlgorithms; ///< The ordered list of clustering algorithms to be used
     std::string m_mcParticleListName; ///< The mc particle list name 
