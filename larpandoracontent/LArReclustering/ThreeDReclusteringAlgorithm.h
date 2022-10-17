@@ -32,6 +32,16 @@ public:
 private:
 
     pandora::StatusCode Run();
+
+    /**
+     *  @brief 
+     *
+     *  @param 
+     *
+     *  @return List of 
+     */
+    pandora::StatusCode FindBestThreeDClusters(pandora::ClusterList clusterList3D, std::string &reclusterListName, pandora::ClusterList &minimumFigureOfMeritClusterList);
+
     /**
      *  @brief Get the theoretical lateral profile value at the shower maximum for a given energy and radius (Grindhammer)
      *
@@ -75,9 +85,13 @@ private:
     int GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit);
     int GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle);
 
+    //This can then go in the SDK with the name/format PandoraContentApi::RebuildLArTPCPfo(Algorithm &, Pfo  *pPfoToRebuild, Cluster *pTemplate3DCluster, MapOfListNameInfo &)
+     pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList &newThreeDClusters); 
+
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
+    std::string m_newPfosListNameAllAfterReclustering;
     bool m_visualDisplaysOn; //Boolean to enable and disable displaying transverse profiles
     int m_hitThresholdForNewPfo; //Minimum nr. of hits to form new 3Dcluster and pfo
     pandora::StringVector   m_clusteringAlgorithms; ///< The ordered list of clustering algorithms to be used
