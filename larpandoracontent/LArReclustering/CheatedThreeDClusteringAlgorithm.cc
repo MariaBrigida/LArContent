@@ -41,12 +41,12 @@ StatusCode CheatedThreeDClusteringAlgorithm::Run()
 
 
     ClusterVector clusterVector;
-    if(m_drawProfiles)
+/*    if(m_drawProfiles)
     {
         PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
         PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), pCaloHitList, "CurrentClusterHits", BLUE));
         PandoraMonitoringApi::ViewEvent(this->GetPandora());
-    }
+    }*/
 
     
     for (const CaloHit *const pCaloHit : *pCaloHitList)
@@ -90,14 +90,14 @@ StatusCode CheatedThreeDClusteringAlgorithm::Run()
     }
 
     //Now I want to display all of these new clusters!
-    if(m_drawProfiles)PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
+//    if(m_drawProfiles)PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));   
     for(const Cluster* pNewCluster: clusterVector)
     { 
       ClusterList newClusters;
       newClusters.push_back(pNewCluster);  
-      if(m_drawProfiles)PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &newClusters, "newClusters", AUTOITER));
+      //if(m_drawProfiles)PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &newClusters, "newClusters", AUTOITER));
     }
-    if(m_drawProfiles)PandoraMonitoringApi::ViewEvent(this->GetPandora());
+//    if(m_drawProfiles)PandoraMonitoringApi::ViewEvent(this->GetPandora());
 
     return STATUS_CODE_SUCCESS;
 }
