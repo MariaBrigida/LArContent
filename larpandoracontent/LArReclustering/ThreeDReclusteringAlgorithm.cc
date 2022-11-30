@@ -43,7 +43,7 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
 {
     std::cout << "--------------------------------------------- NEW EVENT ------------------------------------------------" << std::endl;
     //if(m_visualDisplaysOn)PANDORA_MONITORING_API(SetEveDisplayParameters(this->GetPandora(), false, DETECTOR_VIEW_XZ, -1.f, -1.f, 1.f));
-
+    //test
     // Get shower pfos and then find the 3D cluster in the shower pfo.
     const PfoList *pShowerPfoList(nullptr);
     std::string initialPfosListName;
