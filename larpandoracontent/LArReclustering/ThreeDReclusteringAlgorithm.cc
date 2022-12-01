@@ -88,6 +88,7 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
             //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
             const ClusterList *pShowerClusters(nullptr);
             PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
+            if(!pShowerClusters) continue;
             if(pShowerClusters->end() == std::find(pShowerClusters->begin(), pShowerClusters->end(), clusterList3D.front())) continue;
 
 
@@ -125,13 +126,10 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
            {
                std::cout << "THE CLUSTER LIST CHANGED! I need to make " << minimumFigureOfMeritClusterList.size() << " new pfos." << std::endl;
                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndReclustering(*this, reclusterListName));
-               //std::cout << "debug0" << std::endl;
                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, this->RebuildPfo(pShowerPfo, minimumFigureOfMeritClusterList));
-               //std::cout << "debug1" << std::endl;
 
 /*               const PfoList *pDebugNewPfos(nullptr);
                PandoraContentApi::GetList(*this, m_newPfosListNameAllAfterReclustering, pDebugNewPfos);
-               std::cout << "debug2" << std::endl;
 
                if(m_visualDisplaysOn)
                {
@@ -144,18 +142,13 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
             iPfo++;
         }
 
-        //std::cout << "debug3" << std::endl;
         if(unchangedPfoList.size()>0) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<PfoList>(*this, "ShowerParticles3D", m_newPfosListNameAllAfterReclustering,  unchangedPfoList));
-        //std::cout << "debug4" << std::endl;
 
         const PfoList *pNewPfosListAllAfterReclustering;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, m_newPfosListNameAllAfterReclustering, pNewPfosListAllAfterReclustering));
-        //std::cout << "debug5" << std::endl;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, m_newPfosListNameAllAfterReclustering, "ShowerParticles3D"));
-        //std::cout << "debug6" << std::endl;
         const PfoList *pShowerParticles3DDebug;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, "ShowerParticles3D", pShowerParticles3DDebug));
-        //std::cout << "debug7" << std::endl;
 /*
         if(m_visualDisplaysOn)
         {
@@ -165,7 +158,6 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
         }
 */
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Pfo>(*this, initialPfosListName));
-        //std::cout << "debug8" << std::endl;
 
     }
 
