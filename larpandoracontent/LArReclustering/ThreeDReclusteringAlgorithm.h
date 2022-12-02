@@ -52,6 +52,15 @@ private:
      */
     float GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm);
 
+
+    float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
+    
+    float GetFigureOfMerit(std::string figureOfMeritName, pandora::CaloHitList mergedClusterCaloHitList3D);
+
+    float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
+
+    float GetFigureOfMerit(std::string figureOfMeritName, pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitLists3D);
+
     /** 
      *  @brief Use this to find cheated FOM by finding the shower purity as the fraction of hits that the main Mc particle is contributing to
      * @param Merged cluster hit list
@@ -60,6 +69,8 @@ private:
     float GetCheatedFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
     
     float GetCheatedFigureOfMerit(std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
+
+
 
     /** 
      *  @brief Use this to find FOM by comparing observed transverse profiles to prediction for one shower
@@ -91,6 +102,7 @@ private:
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
+    pandora::StringVector m_figureOfMeritNames; ///what figure(s) of merit to use
     std::string m_newPfosListNameAllAfterReclustering;
     bool m_visualDisplaysOn; //Boolean to enable and disable displaying transverse profiles
     int m_hitThresholdForNewPfo; //Minimum nr. of hits to form new 3Dcluster and pfo

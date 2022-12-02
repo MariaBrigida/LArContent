@@ -391,12 +391,12 @@ StatusCode ThreeDReclusteringAlgorithm::FindBestThreeDClusters(ClusterList clust
 {
     CaloHitList caloHitList3D;
     clusterList3D.front()->GetOrderedCaloHitList().FillCaloHitList(caloHitList3D);
-
-    float initialFigureOfMerit=this->GetCheatedFigureOfMerit(caloHitList3D);
-    std::cout << "InitialFigureOfMerit = " << initialFigureOfMerit << std::endl;
+    float initialFigureOfMerit=this->GetFigureOfMerit(caloHitList3D);
+    if(initialFigureOfMerit<0) {std::cout << "Could not calculate initial FOM!" << std::endl; return STATUS_CODE_FAILURE;} 
 
     //Call the reclustering algos that produce new cluster candidates
     float minimumFigureOfMerit(initialFigureOfMerit);
+    std::cout << "InitialFigureOfMerit = " << initialFigureOfMerit << std::endl;
     minimumFigureOfMeritClusterList = clusterList3D;
     std::vector<float> mainClusterFractionVector,  initialFigureOfMeritVector, newFigureOfMeritVector, nHitsInitialFomVector, nFinalClustersVector;
     const ClusterList *pReclusterList = NULL;
@@ -445,7 +445,7 @@ StatusCode ThreeDReclusteringAlgorithm::FindBestThreeDClusters(ClusterList clust
         if(!newClustersCaloHitLists3D.size()) continue; 
         float mainClusterFraction = (float)newClustersCaloHitLists3D.front().size()/caloHitList3D.size();
         //float newFigureOfMerit = this->GetTransverseProfileFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D); //I am also passing original caloHitList3D as the FOM uses the original PCA calculations
-        float newFigureOfMerit = this->GetCheatedFigureOfMerit(newClustersCaloHitLists3D); //Cheated FOM for group of new clusters is the minimum cheated FOM among those clusters
+        float newFigureOfMerit = this->GetFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D); //Cheated FOM for group of new clusters is the minimum cheated FOM among those clusters
         std::cout << "newFigureOfMerit = " << newFigureOfMerit << std::endl;
         mainClusterFractionVector.push_back(mainClusterFraction);  ///watch out, these are in the loop over many algorithms! if I add more clustering algos I will need to differentiate the entries in these
 
@@ -488,6 +488,48 @@ float ThreeDReclusteringAlgorithm::GetLateralProfileAtShowerMaximum(float cluste
 
 }
 
+
+
+float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritName, CaloHitList mergedClusterCaloHitList3D)
+{
+    float figureOfMerit(-999);
+    if(figureOfMeritName=="cheated") figureOfMerit=this->GetCheatedFigureOfMerit(mergedClusterCaloHitList3D);
+    else if(figureOfMeritName=="transversecalo") figureOfMerit=this->GetTransverseProfileFigureOfMerit(mergedClusterCaloHitList3D);
+    return figureOfMerit;
+}
+
+float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
+{
+    std::vector<float> figureOfMeritVector;
+    for (StringVector::const_iterator iter = m_figureOfMeritNames.begin(), iterEnd = m_figureOfMeritNames.end(); iter != iterEnd; ++iter)
+    {
+        figureOfMeritVector.push_back(this->GetFigureOfMerit(*iter,mergedClusterCaloHitList3D)); 
+    }
+    
+    float figureOfMerit=*(std::min_element(figureOfMeritVector.begin(), figureOfMeritVector.end()));
+    return figureOfMerit;
+}
+
+
+float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritName, CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+{
+    float figureOfMerit(-999);
+    if(figureOfMeritName=="cheated")figureOfMerit=this->GetCheatedFigureOfMerit(newClustersCaloHitLists3D);
+    else if(figureOfMeritName=="transversecalo") figureOfMerit=this->GetTransverseProfileFigureOfMerit(mergedClusterCaloHitList3D, newClustersCaloHitLists3D);
+    return figureOfMerit;
+}
+
+float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+{
+    std::vector<float> figureOfMeritVector;
+    for (StringVector::const_iterator iter = m_figureOfMeritNames.begin(), iterEnd = m_figureOfMeritNames.end(); iter != iterEnd; ++iter)
+    {
+        figureOfMeritVector.push_back(this->GetFigureOfMerit(*iter,mergedClusterCaloHitList3D,newClustersCaloHitLists3D)); 
+    }
+    
+    float figureOfMerit=*(std::min_element(figureOfMeritVector.begin(), figureOfMeritVector.end()));
+    return figureOfMerit;
+}
 
 float ThreeDReclusteringAlgorithm::GetCheatedFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
 {
@@ -542,7 +584,6 @@ int ThreeDReclusteringAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *
       } 
     }
     return iMcPart;
-
 }
 
 int ThreeDReclusteringAlgorithm::GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle)
@@ -837,8 +878,8 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     observedTransverseProfile.Scale(clusterEnergyInMeV/observedTransverseProfile.GetCumulativeSum());
 
 
-
-    TwoDHistogram expectedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
+    //A 1 cluster expected profile
+    TwoDHistogram expectedTransverseProfile_oneShower(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
     //Expected tranvserse profile (Grindhammer parametrisation)
     for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
     {
@@ -848,10 +889,35 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
            float profileY=transverseProfileLow+iBinY*transverseProfileBinSize;
            float profileRadius=std::sqrt(profileX*profileX+profileY*profileY);
            float profileValue=GetLateralProfileAtShowerMaximum(clusterEnergyInMeV,profileRadius);
-           expectedTransverseProfile.SetBinContent(iBinX, iBinY, profileValue);
+           expectedTransverseProfile_oneShower.SetBinContent(iBinX, iBinY, profileValue);
         }
     }
-    expectedTransverseProfile.Scale(clusterEnergyInMeV/expectedTransverseProfile.GetCumulativeSum());
+    expectedTransverseProfile_oneShower.Scale(clusterEnergyInMeV/expectedTransverseProfile_oneShower.GetCumulativeSum());
+
+    //Now I want to calculate a 2 cluster expected profile, calculate FOM in both cases, and take the ratio, and this will be the final FOM
+    //A 1 cluster expected profile
+    TwoDHistogram expectedTransverseProfile_twoShowers(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
+    //Expected tranvserse profile (Grindhammer parametrisation)
+    /*for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
+    {
+        float profileX=transverseProfileLow+iBinX*transverseProfileBinSize;
+        for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
+        {
+           float profileY=transverseProfileLow+iBinY*transverseProfileBinSize;
+            //xdist_1=el[0]-x1
+            //ydist_1=el[1]-y1
+            //xdist_2=el[0]-x2
+            //ydist_2=el[1]-y2
+            //radius_oneshower=np.sqrt(el[0]*el[0]+el[1]*el[1])
+            //radius_shower1=np.sqrt(xdist_1*xdist_1+ydist_1*ydist_1)
+            //radius_shower2=np.sqrt(xdist_2*xdist_2+ydist_2*ydist_2)
+           float profileRadius1=std::sqrt(profileX*profileX+profileY*profileY);
+           float profileValue=GetLateralProfileAtShowerMaximum(clusterEnergyInMeV1,profileRadius1)+GetLateralProfileAtShowerMaximum(clusterEnergyInMeV2,profileRadius2);
+           expectedTransverseProfile_twoShowers.SetBinContent(iBinX, iBinY, profileValue);
+        }
+    }
+    expectedTransverseProfile_twoShowers.Scale(clusterEnergyInMeV/expectedTransverseProfile_twoShowers.GetCumulativeSum());
+    */
 
     //Calculate figure of merit for this cluster
     float squaredDiffSum(0);
@@ -859,7 +925,7 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     {
         for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
         {
-          float diff = expectedTransverseProfile.GetBinContent(iBinX, iBinY)-observedTransverseProfile.GetBinContent(iBinX,iBinY);
+          float diff = expectedTransverseProfile_oneShower.GetBinContent(iBinX, iBinY)-observedTransverseProfile.GetBinContent(iBinX,iBinY);
           float squaredDiff = diff*diff;     
           squaredDiffSum+=squaredDiff;
         }
@@ -885,8 +951,9 @@ bool ThreeDReclusteringAlgorithm::PassesCutsForReclustering(const pandora::Parti
 StatusCode ThreeDReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "PfoListName", m_pfoListName));
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadVectorOfValues(xmlHandle, "FigureOfMeritNames", m_figureOfMeritNames));
     PANDORA_RETURN_RESULT_IF_AND_IF(STATUS_CODE_SUCCESS, STATUS_CODE_NOT_FOUND, !=, XmlHelper::ReadValue(xmlHandle, "VisualDisplaysOn", m_visualDisplaysOn));
-    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ProcessAlgorithmList(*this, xmlHandle, "clusteringAlgorithms", m_clusteringAlgorithms));
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ProcessAlgorithmList(*this, xmlHandle, "ClusteringAlgorithms", m_clusteringAlgorithms));
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "MCParticleListName", m_mcParticleListName));
     PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, XmlHelper::ReadValue(xmlHandle, "HitThresholdForNewPfo", m_hitThresholdForNewPfo));
 
