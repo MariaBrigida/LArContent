@@ -99,6 +99,10 @@ private:
     //This can then go in the SDK with the name/format PandoraContentApi::RebuildLArTPCPfo(Algorithm &, Pfo  *pPfoToRebuild, Cluster *pTemplate3DCluster, MapOfListNameInfo &)
      pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList &newThreeDClusters); 
 
+
+    //pandora::StatusCode GetKmeansPredictions(pandora::TwoDHistogram observedTransverseProfile, float &center1, float &center2, float &energy1, float &energy2);
+    pandora::StatusCode GetKmeansPredictions(std::vector<float> caloHitProjectedPosition1Vect, std::vector<float> caloHitProjectedPosition2Vect, std::vector<float> caloHitEnergyVect, pandora::TwoDHistogram observedTransverseProfile, pandora::CartesianVector &center1, pandora::CartesianVector &center2, float &energy1, float &energy2);
+
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)

@@ -654,12 +654,17 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     float transverseProfileBinSize = (transverseProfileHigh-transverseProfileLow)/transverseProfileNBins;
     TwoDHistogram observedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
 
+    std::vector<float> caloHitProjectedPosition1Vect, caloHitProjectedPosition2Vect;
+
     for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
     {
         const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
         const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
         const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
         observedTransverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
+        //Also save hit projections into vectors
+        caloHitProjectedPosition1Vect.push_back(position1);
+        caloHitProjectedPosition2Vect.push_back(position2);
     }
 
     //Scale observed profile to total cluster energy
@@ -866,12 +871,18 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     float transverseProfileBinSize = (transverseProfileHigh-transverseProfileLow)/transverseProfileNBins;
     TwoDHistogram observedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
 
+    std::vector<float> caloHitProjectedPosition1Vect, caloHitProjectedPosition2Vect, caloHitEnergyVect;
+
     for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
     {
         const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
         const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
         const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
         observedTransverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
+        caloHitProjectedPosition1Vect.push_back(position1);
+        caloHitProjectedPosition2Vect.push_back(position2);
+        caloHitEnergyVect.push_back(pCaloHit3D->GetInputEnergy());
+
     }
 
     //Scale observed profile to total cluster energy
@@ -895,8 +906,24 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     expectedTransverseProfile_oneShower.Scale(clusterEnergyInMeV/expectedTransverseProfile_oneShower.GetCumulativeSum());
 
     //Now I want to calculate a 2 cluster expected profile, calculate FOM in both cases, and take the ratio, and this will be the final FOM
-    //A 1 cluster expected profile
-    TwoDHistogram expectedTransverseProfile_twoShowers(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
+    //I need to use something like kMeans to predict shower centers and energies based on observed profile!
+    CartesianVector center1(0,0,0), center2(0,0,0);
+    float energy1(-999999), energy2(-999999);
+
+
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, this->GetKmeansPredictions(caloHitProjectedPosition1Vect, caloHitProjectedPosition2Vect, caloHitEnergyVect, observedTransverseProfile, center1, center2, energy1, energy2)); 
+    //std::cout << "center1 = " << center1 << " center2 = " << center2 << " energy1 = " << energy1 << " energy2 = " << energy2 << std::endl;
+
+    //Just visualise transverse profile for debugging kMeans
+    TwoDHistogram observedTransverseProfileCenters(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
+    observedTransverseProfileCenters.Fill(center1.GetX(),center1.GetY(),energy1);
+    observedTransverseProfileCenters.Fill(center2.GetX(),center2.GetY(),energy2);
+    PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedTransverseProfile, "COLZ");
+    PandoraMonitoringApi::DrawPandoraHistogram(this->GetPandora(), observedTransverseProfileCenters, "COLZ");
+
+
+    //A 2 cluster expected profile
+    //TwoDHistogram expectedTransverseProfile_twoShowers(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
     //Expected tranvserse profile (Grindhammer parametrisation)
     /*for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
     {
@@ -918,6 +945,33 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     }
     expectedTransverseProfile_twoShowers.Scale(clusterEnergyInMeV/expectedTransverseProfile_twoShowers.GetCumulativeSum());
     */
+
+    /*
+            newClusterEnergies.push_back(clusterEnergy);
+            newClustersCenterPositionsX.push_back(newObservedTransverseProfile.GetMeanX());
+            newClustersCenterPositionsY.push_back(newObservedTransverseProfile.GetMeanY());
+        }
+
+        //Expected tranvserse profile (Grindhammer parametrisation as a combination of N shower profiles)
+        for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
+        {
+            float profileX=transverseProfileLow+iBinX*transverseProfileBinSize;
+            for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
+            {
+               float profileY=transverseProfileLow+iBinY*transverseProfileBinSize;
+               float profileValue(0), shiftedRadius(0), shiftedX(0), shiftedY(0);
+               for(std::vector<double>::size_type iCluster=0; iCluster<newClusterEnergies.size(); iCluster++){
+                   shiftedX=profileX-newClustersCenterPositionsX.at(iCluster);
+                   shiftedY=profileY-newClustersCenterPositionsY.at(iCluster);
+                   shiftedRadius=std::sqrt(shiftedX*shiftedX+shiftedY*shiftedY);
+                   profileValue+=GetLateralProfileAtShowerMaximum(newClusterEnergies.at(iCluster)*convertADCToMeV,shiftedRadius);
+               }
+               expectedTransverseProfile.SetBinContent(iBinX, iBinY, profileValue);
+            }
+        }
+        expectedTransverseProfile.Scale(clusterEnergyInMeV/expectedTransverseProfile.GetCumulativeSum());
+    */
+
 
     //Calculate figure of merit for this cluster
     float squaredDiffSum(0);
@@ -946,6 +1000,145 @@ bool ThreeDReclusteringAlgorithm::PassesCutsForReclustering(const pandora::Parti
 {
     if (LArPfoHelper::IsShower(pShowerPfo)) return true;
     return false;
+}
+
+//A kmeans algorithm implementation from the internet. For now K=2!!
+StatusCode ThreeDReclusteringAlgorithm::GetKmeansPredictions(std::vector<float> caloHitProjectedPosition1Vect, std::vector<float> caloHitProjectedPosition2Vect, std::vector<float> caloHitEnergyVect, TwoDHistogram observedTransverseProfile, CartesianVector &center1, CartesianVector &center2, float &energy1, float &energy2)
+{
+    std::cout << "obs prof N bins X for debug = " << observedTransverseProfile.GetNBinsX() << std::endl;
+
+    std::cout << "caloHitProjectedPosition1Vect size = " << caloHitProjectedPosition1Vect.size() << " caloHitProjectedPosition2Vect size = " << caloHitProjectedPosition2Vect.size() << std::endl;
+
+    //GetXLow() GetYHigh() GetYBinWidth() GetBinContent(const int binX, const int binY)GetBinNumberX(const float valueX) const; GetMinBinNumberX() GetCumulativeSum() GetMaximum GetMeanX() GetStandardDeviationY
+
+    //int max_iterations(20);
+    //Use the value of K random data points as the centers
+    std::vector<float> InitialCenterPositions1, InitialCenterPositions2;
+    int rand1 = rand()%caloHitProjectedPosition1Vect.size();
+    InitialCenterPositions1.push_back(caloHitProjectedPosition1Vect.at(rand1));
+    InitialCenterPositions2.push_back(caloHitProjectedPosition2Vect.at(rand1));
+    int rand2 = rand1;
+    while(rand2 == rand1) rand2 = rand()%caloHitProjectedPosition1Vect.size();
+    InitialCenterPositions1.push_back(caloHitProjectedPosition1Vect.at(rand2));
+    InitialCenterPositions2.push_back(caloHitProjectedPosition2Vect.at(rand2));
+
+    //float InitialError(std::numeric_limits<float>::max());
+    float error(999999), centerDistance(999999)/*, cluster1Position1Sum(0), cluster1Position2Sum(0),cluster2Position1Sum(0),cluster2Position2Sum(0)*/;
+    float cluster1Position1(0), cluster1Position2(0), cluster2Position1(0), cluster2Position2(0);
+    int nIterations(0);
+
+    cluster1Position1=InitialCenterPositions1.at(0);
+    cluster1Position2=InitialCenterPositions1.at(1);
+    cluster1Position1=InitialCenterPositions1.at(0);
+    cluster1Position2=InitialCenterPositions1.at(1);
+
+    while(error > 2 && nIterations < 10 && centerDistance > 0.01)
+    {
+        std::cout << "error at start of while loop = " << error << std::endl;
+        error=0; centerDistance=0; energy1=0; energy2=0;
+        cluster1Position1=0;
+        cluster1Position2=0;
+        cluster2Position1=0;
+        cluster2Position2=0;
+        //Add points to nearest center
+        //std::vector<float> cluster1Position1, cluster1Position2, cluster2Position1, cluster2Position2;
+        int nHitsInCluster1(0), nHitsInCluster2(0);
+        for(long unsigned int iPoint=0; iPoint<caloHitProjectedPosition1Vect.size(); iPoint++)
+        {
+          std::cout << "InitialCenterPositions1.at(0) = " << InitialCenterPositions1.at(0) << " InitialCenterPositions1.at(1) = " << InitialCenterPositions1.at(1) << std::endl;
+          std::cout << "InitialCenterPositions2.at(0) = " << InitialCenterPositions2.at(0) << " InitialCenterPositions2.at(1) = " << InitialCenterPositions2.at(1) << std::endl;
+          //std::cout << "point n. " << iPoint << " pos1 = " << caloHitProjectedPosition1Vect.at(iPoint) << " pos2 = " << caloHitProjectedPosition2Vect.at(iPoint) << std::endl;
+          float distFromCenter1 = std::sqrt((caloHitProjectedPosition1Vect.at(iPoint)-InitialCenterPositions1.at(0))*(caloHitProjectedPosition1Vect.at(iPoint)-InitialCenterPositions1.at(0))+(caloHitProjectedPosition2Vect.at(iPoint)-InitialCenterPositions2.at(0))*(caloHitProjectedPosition2Vect.at(iPoint)-InitialCenterPositions2.at(0)));
+          float distFromCenter2 = std::sqrt((caloHitProjectedPosition1Vect.at(iPoint)-InitialCenterPositions1.at(1))*(caloHitProjectedPosition1Vect.at(iPoint)-InitialCenterPositions1.at(1))+(caloHitProjectedPosition2Vect.at(iPoint)-InitialCenterPositions2.at(1))*(caloHitProjectedPosition2Vect.at(iPoint)-InitialCenterPositions2.at(1)));
+          std::cout << "dist1 = " << distFromCenter1 << " dist2 = " << distFromCenter2 << std::endl;
+          if(distFromCenter1<distFromCenter2)
+          {
+              error += distFromCenter1*distFromCenter1;
+              //I sum positions here so that I can calculate new centers later
+              cluster1Position1+=caloHitProjectedPosition1Vect.at(iPoint);
+              cluster1Position2+=caloHitProjectedPosition2Vect.at(iPoint);
+              energy1+=caloHitEnergyVect.at(iPoint);
+              nHitsInCluster1++;
+          }
+          else
+          {
+              error += distFromCenter2*distFromCenter2;
+              //I sum positions here so that I can calculate new centers later
+              cluster2Position1+=caloHitProjectedPosition1Vect.at(iPoint);
+              cluster2Position2+=caloHitProjectedPosition2Vect.at(iPoint);
+              energy2+=caloHitEnergyVect.at(iPoint);
+              nHitsInCluster2++;
+          }
+        }
+    
+        //Update new clusters centers
+        cluster1Position1=cluster1Position1/nHitsInCluster1;
+        cluster1Position2=cluster1Position2/nHitsInCluster1;
+        cluster2Position1=cluster2Position1/nHitsInCluster2;
+        cluster2Position2=cluster2Position2/nHitsInCluster2;
+        float centerDistance1=std::sqrt((InitialCenterPositions1.at(0)-cluster1Position1)*(InitialCenterPositions1.at(0)-cluster1Position1)+(InitialCenterPositions1.at(1)-cluster1Position2)*(InitialCenterPositions1.at(1)-cluster1Position2));
+        float centerDistance2=std::sqrt((InitialCenterPositions2.at(0)-cluster2Position1)*(InitialCenterPositions2.at(0)-cluster2Position1)+(InitialCenterPositions2.at(1)-cluster2Position2)*(InitialCenterPositions2.at(1)-cluster2Position2));
+        centerDistance=std::max(centerDistance1,centerDistance2);
+        InitialCenterPositions1.at(0)=cluster1Position1;
+        InitialCenterPositions1.at(1)=cluster1Position2;
+        InitialCenterPositions2.at(0)=cluster2Position1;
+        InitialCenterPositions2.at(1)=cluster2Position2;
+        
+        std::cout << "Error = " << error << " new cluster 1 center = " << InitialCenterPositions1.at(0) << " " << InitialCenterPositions1.at(1) << " new cluster 2 center = " << InitialCenterPositions2.at(0) << " " << InitialCenterPositions2.at(1) << " maximum distance between old and new centers = " << centerDistance << std::endl;
+        nIterations++;   
+    }
+        std::cout << "AT THE END Error = " << error << " new cluster 1 center = " << InitialCenterPositions1.at(0) << " " << InitialCenterPositions1.at(1) << " new cluster 2 center = " << InitialCenterPositions2.at(0) << " " << InitialCenterPositions2.at(1) << " maximum distance between old and new centers = " << centerDistance << std::endl;
+
+        center1.SetValues(InitialCenterPositions1.at(0),InitialCenterPositions1.at(1),0);
+        center2.SetValues(InitialCenterPositions2.at(0),InitialCenterPositions2.at(1),0);
+
+
+
+//recalculate centers per cluster
+//vector<int> cnt(K, 0);
+//vector<int> sum(K, 0);
+//float err=0;
+//for(int i = 0; i<A.size(); i++)
+//{
+//int cid = cluster[i];
+//cnt[cid]++;
+//sum[cid]+=A[i];
+////error
+//err+=abs(static_cast<float>(A[i])-centers[cid]);
+//}
+//float delta = abs(lastErr — err);
+//cout<<”error “<<err<< “ delta “ << delta <<endl;
+//if(delta < 0.1)break;
+//lastErr = err;
+
+
+/*    std::cout << "debug. center 1 pos 1 = " << InitialCenterPositions1.at(0) << " pos 2 = " << InitialCenterPositions2.at(0) << std::endl;
+    std::cout << "center 1 cluster positions 1" << std::endl;
+    for(auto pos1: cluster1Position1)
+    {
+        std::cout << "pos1 = " << pos1 << std::endl;
+    }
+    std::cout << "debug. center 2 pos 1 = " << InitialCenterPositions1.at(1) << " pos 2 = " << InitialCenterPositions2.at(1) << std::endl;
+     std::cout << "center 2 cluster positions 1" << std::endl;
+    for(auto pos1: cluster2Position1)
+    {
+        std::cout << "pos1 = " << pos1 << std::endl;
+    }*/
+   
+       
+//vector<int> cluster(A.size(),-1);
+//float lastErr = 0;
+//while(true)
+//assigning to cluster
+//for(int i = 0; i<A.size(); i++)
+//{
+//int cid = findClusterID(centers, A[i]);
+//cluster[i] = cid;
+//}
+
+
+
+    return STATUS_CODE_SUCCESS;
 }
 
 StatusCode ThreeDReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
