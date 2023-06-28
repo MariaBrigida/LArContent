@@ -45,6 +45,9 @@ private:
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
     pandora::StatusCode PrepareTrainingSample();
     pandora::StatusCode Infer();
+    int GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit);
+
+
 
     bool m_trainingMode;                      ///< Training mode
     std::string m_trainingOutputFile;         ///< Output file name for training examples
@@ -52,9 +55,9 @@ private:
     bool m_writeTree;                         ///< Whether or not to write validation details to a ROOT tree
     std::string m_rootTreeName;               ///< The ROOT tree name
     std::string m_rootFileName;               ///< The ROOT file name
-    pandora::StringVector m_caloHitListNames; ///< Names of input calo hit lists
+    //pandora::StringVector m_caloHitListNames; ///< Names of input calo hit lists
     std::mt19937 m_rng;                       ///< The random number generator
- 
+    std::string m_mcParticleListName;         ///< The mc particle list name 
 
 
 
