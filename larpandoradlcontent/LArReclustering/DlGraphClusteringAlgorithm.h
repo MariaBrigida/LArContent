@@ -58,6 +58,7 @@ private:
     //pandora::StringVector m_caloHitListNames; ///< Names of input calo hit lists
     std::mt19937 m_rng;                       ///< The random number generator
     std::string m_mcParticleListName;         ///< The mc particle list name 
+    LArDLHelper::TorchModel m_model;
 
 
 
