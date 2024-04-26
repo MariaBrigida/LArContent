@@ -45,6 +45,7 @@ private:
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
     pandora::StatusCode PrepareTrainingSample();
     pandora::StatusCode Infer();
+    pandora::StatusCode Test();
     int GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit);
 
 

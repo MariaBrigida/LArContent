@@ -63,9 +63,13 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
 
             ClusterList clusterList3D;
             LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
-
-            if(!this->PassesCutsForReclustering(pShowerPfo)) continue; // this function just checks it's a shower at the moment
-
+            
+            if(!this->PassesCutsForReclustering(pShowerPfo))
+            {
+                unchangedPfoList.push_back(pShowerPfo);
+                continue; // this function just checks it's a shower at the moment
+            }
+            std::cout << "DEBUG passed cuts for reclustering" << std::endl;
             // Get the longitudinal and transverse shower profiles
             if (clusterList3D.empty())
                 continue;
@@ -141,14 +145,17 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
            }
             iPfo++;
         }
-
+        std::cout << "DEBUG I ran over the entire pfo list" << std::endl;
         if(unchangedPfoList.size()>0) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<PfoList>(*this, "ShowerParticles3D", m_newPfosListNameAllAfterReclustering,  unchangedPfoList));
-
+        std::cout << "DEBUG unchangedPfoList.size() = " << unchangedPfoList.size() << std::endl;
         const PfoList *pNewPfosListAllAfterReclustering;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, m_newPfosListNameAllAfterReclustering, pNewPfosListAllAfterReclustering));
+        std::cout << "DEBUG 0" << std::endl;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, m_newPfosListNameAllAfterReclustering, "ShowerParticles3D"));
+        std::cout << "DEBUG 1" << std::endl;
         const PfoList *pShowerParticles3DDebug;
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList<PfoList>(*this, "ShowerParticles3D", pShowerParticles3DDebug));
+        std::cout << "DEBUG 2" << std::endl;
 /*
         if(m_visualDisplaysOn)
         {
@@ -942,10 +949,31 @@ float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList
     return figureOfMerit;
 }
 
+//At the moment I only want to select showers with reasonably high impurity; this is to produce a training sample and to test on the most useful scenario
+//(In reality training stage I am even more restrictive: I ask that the 2nd most contributing particle contributes at least 30%. So the total impurity across all further contributions can be higher than this 30%. This is ok.
 bool ThreeDReclusteringAlgorithm::PassesCutsForReclustering(const pandora::ParticleFlowObject *const pShowerPfo)
 {
-    if (LArPfoHelper::IsShower(pShowerPfo)) return true;
-    return false;
+    if (!LArPfoHelper::IsShower(pShowerPfo)) return false;
+    ClusterList clusterList3D;
+    LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
+
+    if (clusterList3D.empty()) return false;
+    CaloHitList caloHitList3D;
+    clusterList3D.front()->GetOrderedCaloHitList().FillCaloHitList(caloHitList3D);
+    //Quality cuts
+    if (caloHitList3D.size() < 2) return false;
+
+    //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
+    const ClusterList *pShowerClusters(nullptr);
+    PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
+    if(!pShowerClusters) return false;
+    if(pShowerClusters->end() == std::find(pShowerClusters->begin(), pShowerClusters->end(), clusterList3D.front())) return false;
+
+    if(this->GetCheatedFigureOfMerit(caloHitList3D)<0.3) return false; //30% impurity at least
+    return true;
+    //This is what there was in this function originally (just the two lines below):
+    //if (LArPfoHelper::IsShower(pShowerPfo)) return true;
+    //return false;
 }
 
 StatusCode ThreeDReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)

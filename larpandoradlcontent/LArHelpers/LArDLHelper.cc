@@ -36,11 +36,35 @@ void LArDLHelper::InitialiseInput(const at::IntArrayRef dimensions, TorchInput &
     tensor = torch::zeros(dimensions);
 }
 
+void LArDLHelper::InitialiseInput(const at::IntArrayRef dimensions, TorchInput &tensor, at::ScalarType type = at::kFloat)
+{
+    tensor = torch::zeros(dimensions,type);
+}
+
 //------------------------------------------------------------------------------------------------------------------------------------------
 
 void LArDLHelper::Forward(TorchModel &model, const TorchInputVector &input, TorchOutput &output)
 {
-    output = model.forward(input).toTensor();
+	std::cout << "DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    //output = model.forward(input).toTensor();
+    try {
+        // Your model and input tensor setup here
+        // torch::Tensor input = ...
+        // Model model = ...
+
+        output = model.forward(input).toTensor();
+   } catch (const torch::Error &e) {
+        // Handle specific torch exceptions
+        std::cerr << "Error during forward pass: " << e.what() << std::endl;
+    } catch (const std::exception &e) {
+        // Handle any other standard exceptions
+        std::cerr << "Standard exception: " << e.what() << std::endl;
+    } catch (...) {
+        // Handle any other exceptions not covered above
+        std::cerr << "An unknown exception occurred during forward pass" << std::endl;
+    }
+
+
 }
 
 } // namespace lar_dl_content
