@@ -47,6 +47,7 @@ private:
     pandora::StatusCode Infer();
     pandora::StatusCode Test();
     int GetMainMcParticleIndex(const pandora::CaloHit *const pCaloHit);
+    int GetMainMcParticlePdgCode(const pandora::CaloHit *const pCaloHit);
 
 
 

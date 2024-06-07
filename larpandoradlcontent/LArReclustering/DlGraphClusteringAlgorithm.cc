@@ -94,6 +94,7 @@ StatusCode DlGraphClusteringAlgorithm::PrepareTrainingSample()
          //    continue; 
          //Find main contributing MC particle Id 
          int mainMcParticleIndex = this->GetMainMcParticleIndex(pParentCaloHit);
+         int mainMcParticlePdgCode = this->GetMainMcParticlePdgCode(pParentCaloHit);
          //In reality I don't need the mainMcParticle index but a label: 1, 2...
          //Do I have to select showers that are only composed of 2 particles? In developing this algo I will assume so.
          double caloHitX = pCaloHit->GetPositionVector().GetX();  //check the actual functions
@@ -104,6 +105,7 @@ StatusCode DlGraphClusteringAlgorithm::PrepareTrainingSample()
 
 		 mainMcParticleIndices.emplace_back(mainMcParticleIndex); 
          featureVector.emplace_back(mainMcParticleIndex);
+         featureVector.emplace_back(mainMcParticlePdgCode);
          featureVector.emplace_back(caloHitX);
          featureVector.emplace_back(caloHitY);
          featureVector.emplace_back(caloHitZ);
@@ -131,7 +133,8 @@ StatusCode DlGraphClusteringAlgorithm::PrepareTrainingSample()
     // std::cout << "secondMostFrequentOccurrence = " << secondMostFrequentOccurrence << " mainMcParticleIndices.size() = " << mainMcParticleIndices.size() << std::endl;
      double secondMostFrequentParticleHitFraction = (double)secondMostFrequentOccurrence/mainMcParticleIndices.size();
      std::cout << "secondMostFrequentParticleHitFraction = " << secondMostFrequentParticleHitFraction << std::endl;
-     if(secondMostFrequentParticleHitFraction<0.3) return STATUS_CODE_SUCCESS; //replace 0.3 with a variable!!
+     //if(secondMostFrequentParticleHitFraction<0.3) return STATUS_CODE_SUCCESS; //replace 0.3 with a variable!!
+     if(secondMostFrequentParticleHitFraction>0.1) return STATUS_CODE_SUCCESS; //replace 0.3 with a variable!!
 
      const std::string trainingFilename{m_trainingOutputFile + ".csv"};
      //featureVector.insert(featureVector.begin() + 8, static_cast<double>(nHits));
@@ -217,7 +220,7 @@ StatusCode DlGraphClusteringAlgorithm::Infer()
 	}
     
     	auto edge_accessor = inputEdgeIndices.accessor<int, 2>();*/
-    std::vector<int> mainMcParticleVector;
+    std::vector<int> mainMcParticleVector, mainMcParticlePdgCodeVector;
     unsigned long iHit{0};
     for (const CaloHit *const pCaloHit : *pCaloHitList)
     {
@@ -227,6 +230,7 @@ StatusCode DlGraphClusteringAlgorithm::Infer()
      //    continue; 
         //Find main contributing MC particle Id 
         int mainMcParticleIndex = this->GetMainMcParticleIndex(pParentCaloHit);
+        int mainMcParticlePdgCode = this->GetMainMcParticlePdgCode(pParentCaloHit);
         //In reality I don't need the mainMcParticle index but a label: 1, 2...
         //Do I have to select showers that are only composed of 2 particles? In developing this algo I will assume so.
         double caloHitX = pCaloHit->GetPositionVector().GetX();  //check the actual functions
@@ -238,6 +242,7 @@ StatusCode DlGraphClusteringAlgorithm::Infer()
         node_accessor[iHit][2] += caloHitZ;
         node_accessor[iHit][3] += caloHitAdc;
         mainMcParticleVector.push_back(mainMcParticleIndex);
+        mainMcParticlePdgCodeVector.push_back(mainMcParticlePdgCode);
         //std::cout << "calo hit mc particle index = " << mainMcParticleIndex << " coord x = " << caloHitX << " y = " << caloHitY << " z = " << caloHitZ << " adc = " << caloHitAdc <<  std::endl;
 
          iHit++;
@@ -350,7 +355,34 @@ int DlGraphClusteringAlgorithm::GetMainMcParticleIndex(const pandora::CaloHit *c
     return iMcPart;
 }
 
+//-----------------------------------------------------------------------------------------------------------------------------------------
 
+//Get vector of MC particles, sort them, loop into the vector and find in map (see "SortMCParticle")
+int DlGraphClusteringAlgorithm::GetMainMcParticlePdgCode(const pandora::CaloHit *const pCaloHit)
+{
+    const MCParticle *const pMCParticle(MCParticleHelper::GetMainMCParticle(pCaloHit));
+    const int pdg{std::abs(pMCParticle->GetParticleId())};
+	return pdg;
+    /*const MCParticleList *pMCParticleList(nullptr);
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetList(*this, m_mcParticleListName, pMCParticleList));
+    MCParticleVector mcParticleVector(pMCParticleList->begin(),pMCParticleList->end());
+    std::sort(mcParticleVector.begin(), mcParticleVector.end(), LArMCParticleHelper::SortByMomentum);
+    int iMcPart(0); 
+    for (const auto &weightMapEntry : pCaloHit->GetMCParticleWeightMap()) 
+    { 
+      if(weightMapEntry.second>0.5) 
+      { 
+        iMcPart=0;  
+        for(const MCParticle *const pMCParticle: mcParticleVector) 
+        { 
+            if(pMCParticle==weightMapEntry.first) { break;} 
+            iMcPart++; 
+        }
+      } 
+    }
+    return iMcPart;*/
+    
+}
 
 /*StatusCode DlGraphClusteringAlgorithm::MakeNetworkInputFromHits(const CaloHitList &caloHits, const HitType view, const float xMin,
     const float xMax, const float zMin, const float zMax, LArDLHelper::TorchInput &networkInput, PixelVector &pixelVector) const
