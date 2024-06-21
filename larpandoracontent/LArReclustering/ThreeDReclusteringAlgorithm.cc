@@ -55,6 +55,12 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
 
         PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Pfo>(*this, initialPfosListName));
 
+        //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
+        const ClusterList *pShowerClusters(nullptr);
+        PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
+        if(!pShowerClusters) continue;
+
+
         int iPfo(0); //for debug
         for (const Pfo *const pShowerPfo : *pShowerPfoList)
         {
@@ -69,9 +75,11 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
                 continue; // this function just checks it's a shower at the moment
             }
             std::cout << "DEBUG passed cuts for reclustering" << std::endl;
-            // Get the longitudinal and transverse shower profiles
             if (clusterList3D.empty())
                 continue;
+
+            //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
+            if(pShowerClusters->end() == std::find(pShowerClusters->begin(), pShowerClusters->end(), clusterList3D.front())) continue;
 
             CaloHitList caloHitList3D;
             clusterList3D.front()->GetOrderedCaloHitList().FillCaloHitList(caloHitList3D);
@@ -79,13 +87,6 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
             //Quality cuts
             if (caloHitList3D.size() < 2)
                 throw StatusCodeException(STATUS_CODE_INVALID_PARAMETER);
-
-            //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
-            const ClusterList *pShowerClusters(nullptr);
-            PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
-            if(!pShowerClusters) continue;
-            if(pShowerClusters->end() == std::find(pShowerClusters->begin(), pShowerClusters->end(), clusterList3D.front())) continue;
-
 
             //Free the hits in this cluster, so that they are available for reclustering!
             //Ask to remove the 3D cluster from the parent pfo, so that it's not owned any more
@@ -330,36 +331,10 @@ StatusCode ThreeDReclusteringAlgorithm::FindBestThreeDClusters(ClusterList clust
     return STATUS_CODE_SUCCESS;
 }
 
-
-//Lateral profile at the shower maximum
-float ThreeDReclusteringAlgorithm::GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm){
-    const float tau=1; //shower maximum
-    float energy=clusterEnergyInMeV/criticalEnergyArgon;
-    float radius=radiusInCm/moliereRadiusCmArgon;
-    float z1 = 0.0251 + 0.00319*std::log(energy);
-    float z2 = 0.1162 - 0.000381*atomicNumberArgon;
-    float k1 = 0.659 - 0.00309*atomicNumberArgon;
-    float k2 = 0.645;
-    float k3 = -2.59;
-    float k4 = 0.3585 + 0.0421*std::log(energy);
-    float p1 = 2.632 - 0.00094*atomicNumberArgon;
-    float p2 = 0.401 + 0.00187*atomicNumberArgon;
-    float p3 = 1.313 - 0.0686*std::log(energy);
-    float Rc = z1+ z2*tau;
-    float Rt = k1*(std::exp(k3*(tau-k2))+std::exp(k4*(tau-k2)));
-    float prob = p1*std::exp((p2-tau)/p3 - std::exp((p2-tau)/p3));
-    float profile = 2*radius*(prob*Rc*Rc/std::pow((radius*radius+Rc*Rc),2)+(1-prob)*Rt*Rt/std::pow((radius*radius+Rt*Rt),2));
-    return profile;
-
-}
-
-
-
 float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritName, CaloHitList mergedClusterCaloHitList3D)
 {
     float figureOfMerit(-999);
     if(figureOfMeritName=="cheated") figureOfMerit=this->GetCheatedFigureOfMerit(mergedClusterCaloHitList3D);
-    else if(figureOfMeritName=="transversecalo") figureOfMerit=this->GetTransverseProfileFigureOfMerit(mergedClusterCaloHitList3D);
     return figureOfMerit;
 }
 
@@ -380,7 +355,6 @@ float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritNam
 {
     float figureOfMerit(-999);
     if(figureOfMeritName=="cheated")figureOfMerit=this->GetCheatedFigureOfMerit(newClustersCaloHitLists3D);
-    else if(figureOfMeritName=="transversecalo") figureOfMerit=this->GetTransverseProfileFigureOfMerit(mergedClusterCaloHitList3D, newClustersCaloHitLists3D);
     return figureOfMerit;
 }
 
@@ -477,279 +451,6 @@ float ThreeDReclusteringAlgorithm::GetCheatedFigureOfMerit(std::vector<CaloHitLi
     }
 
     return minimumFigureOfMerit;
-}
-
-
-float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
-{
-    // Begin with a PCA
-    CartesianVector centroid(0.f, 0.f, 0.f);
-    LArPcaHelper::EigenVectors eigenVecs;
-    LArPcaHelper::EigenValues eigenValues(0.f, 0.f, 0.f);
-    LArPcaHelper::RunPca(mergedClusterCaloHitList3D, centroid, eigenValues, eigenVecs);
-
-    // By convention, the primary axis has a positive z-component.
-    const CartesianVector axisDirection(eigenVecs.at(0).GetZ() > 0.f ? eigenVecs.at(0) : eigenVecs.at(0) * -1.f);
-
-    // Place intercept at hit with minimum projection
-    float minProjection(std::numeric_limits<float>::max());
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
-        minProjection = std::min(minProjection, axisDirection.GetDotProduct(pCaloHit3D->GetPositionVector() - centroid));
-
-    const CartesianVector axisIntercept(centroid + (axisDirection * minProjection));
-
-    // Now define ortho directions
-    const CartesianVector seedDirection((axisDirection.GetX() < std::min(axisDirection.GetY(), axisDirection.GetZ())) ? CartesianVector(1.f, 0.f, 0.f) :
-        (axisDirection.GetY() < std::min(axisDirection.GetX(), axisDirection.GetZ())) ? CartesianVector(0.f, 1.f, 0.f) : CartesianVector(0.f, 0.f, 1.f));
-    const CartesianVector orthoDirection1(seedDirection.GetCrossProduct(axisDirection).GetUnitVector());
-    const CartesianVector orthoDirection2(axisDirection.GetCrossProduct(orthoDirection1).GetUnitVector());
-
-    //Estimate total cluster energy
-    float clusterEnergyInMeV(0);
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D) clusterEnergyInMeV += pCaloHit3D->GetInputEnergy()*convertADCToMeV;
-
-    //Observed transverse profile
-    int transverseProfileNBins = 50;
-    float transverseProfileLow = -50;
-    float transverseProfileHigh = 50;
-    float transverseProfileBinSize = (transverseProfileHigh-transverseProfileLow)/transverseProfileNBins;
-    TwoDHistogram observedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
-
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
-    {
-        const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
-        const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
-        const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
-        observedTransverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
-    }
-
-    //Scale observed profile to total cluster energy
-    observedTransverseProfile.Scale(clusterEnergyInMeV/observedTransverseProfile.GetCumulativeSum());
-
-
-
-    TwoDHistogram expectedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
-    if(newClustersCaloHitLists3D.size()==1 || newClustersCaloHitLists3D.at(0)==mergedClusterCaloHitList3D)
-    {
-        //Expected tranvserse profile (Grindhammer parametrisation)
-        for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
-        {
-            float profileX=transverseProfileLow+iBinX*transverseProfileBinSize;
-            for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
-            {
-               float profileY=transverseProfileLow+iBinY*transverseProfileBinSize;
-               float profileRadius=std::sqrt(profileX*profileX+profileY*profileY);
-               float profileValue=GetLateralProfileAtShowerMaximum(clusterEnergyInMeV,profileRadius);
-               expectedTransverseProfile.SetBinContent(iBinX, iBinY, profileValue);
-            }
-        }
-        expectedTransverseProfile.Scale(clusterEnergyInMeV/expectedTransverseProfile.GetCumulativeSum());
-    }
-
-    //Now, if I passed a new set of cluster hit lists in the second argument, I should separately calculate all of their transverse profiles projecting them onto the same plane as merged shower.
-    else if(newClustersCaloHitLists3D.size()!=1 and newClustersCaloHitLists3D.at(0)!=mergedClusterCaloHitList3D)
-    {
-        std::vector<TwoDHistogram> newObservedTransverseProfiles;
-        std::vector<double> newClusterEnergies;
-        std::vector<float> newClustersCenterPositionsX, newClustersCenterPositionsY;
-        for(CaloHitList newCaloHitList3D: newClustersCaloHitLists3D)
-        {
-            TwoDHistogram newObservedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);;
-             
-            double clusterEnergy(0);
-            for (const CaloHit *const pCaloHit3D : newCaloHitList3D)
-            {
-                const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
-                const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
-                const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
-                newObservedTransverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
-                clusterEnergy+=pCaloHit3D->GetInputEnergy();
-            }
-            newClusterEnergies.push_back(clusterEnergy);
-            newClustersCenterPositionsX.push_back(newObservedTransverseProfile.GetMeanX());
-            newClustersCenterPositionsY.push_back(newObservedTransverseProfile.GetMeanY());
-        }
-
-        //Expected tranvserse profile (Grindhammer parametrisation as a combination of N shower profiles)
-        for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
-        {
-            float profileX=transverseProfileLow+iBinX*transverseProfileBinSize;
-            for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
-            {
-               float profileY=transverseProfileLow+iBinY*transverseProfileBinSize;
-               float profileValue(0), shiftedRadius(0), shiftedX(0), shiftedY(0);
-               for(std::vector<double>::size_type iCluster=0; iCluster<newClusterEnergies.size(); iCluster++){
-                   shiftedX=profileX-newClustersCenterPositionsX.at(iCluster);
-                   shiftedY=profileY-newClustersCenterPositionsY.at(iCluster);
-                   shiftedRadius=std::sqrt(shiftedX*shiftedX+shiftedY*shiftedY);
-                   profileValue+=GetLateralProfileAtShowerMaximum(newClusterEnergies.at(iCluster)*convertADCToMeV,shiftedRadius);
-               }
-               expectedTransverseProfile.SetBinContent(iBinX, iBinY, profileValue);
-            }
-        }
-        expectedTransverseProfile.Scale(clusterEnergyInMeV/expectedTransverseProfile.GetCumulativeSum());
-    }
-
-
-    //Calculate figure of merit for this cluster
-    float squaredDiffSum(0);
-    for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
-    {
-        for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
-        {
-          float diff = expectedTransverseProfile.GetBinContent(iBinX, iBinY)-observedTransverseProfile.GetBinContent(iBinX,iBinY);
-          float squaredDiff = diff*diff;     
-          squaredDiffSum+=squaredDiff;
-        }
-    }
-    float figureOfMerit = squaredDiffSum/clusterEnergyInMeV;
- 
-    return figureOfMerit;
-}
-
-float ThreeDReclusteringAlgorithm::GetLongitudinalProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
-{
-    // Begin with a PCA
-    CartesianVector centroid(0.f, 0.f, 0.f);
-    LArPcaHelper::EigenVectors eigenVecs;
-    LArPcaHelper::EigenValues eigenValues(0.f, 0.f, 0.f);
-    LArPcaHelper::RunPca(mergedClusterCaloHitList3D, centroid, eigenValues, eigenVecs);
-
-    // By convention, the primary axis has a positive z-component.
-    const CartesianVector axisDirection(eigenVecs.at(0).GetZ() > 0.f ? eigenVecs.at(0) : eigenVecs.at(0) * -1.f);
-
-    // Place intercept at hit with minimum projection
-    float minProjection(std::numeric_limits<float>::max());
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
-        minProjection = std::min(minProjection, axisDirection.GetDotProduct(pCaloHit3D->GetPositionVector() - centroid));
-
-    const CartesianVector axisIntercept(centroid + (axisDirection * minProjection));
-
-   // Observed longitudinal profile
-    Histogram observedLongitudinalProfile(140, 0., 140.);
-
-    const float convertADCToMeV(0.0075f); // (c) Maria
-    const float convertGeVToMeV(1000.f);
-    const float convertCmToX0(1.f / 14.f);
-    float clusterEnergyInMeV(0.f);
-
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
-    {
-        const CaloHit *const pParentCaloHit(static_cast<const CaloHit *>(pCaloHit3D->GetParentAddress()));
-
-        if (TPC_VIEW_W != pParentCaloHit->GetHitType())
-            continue;
-
-        clusterEnergyInMeV += convertADCToMeV * pParentCaloHit->GetInputEnergy(); // Used later on
-
-        const float longitudinalCoordInCm((pCaloHit3D->GetPositionVector() - axisIntercept).GetDotProduct(axisDirection));
-        observedLongitudinalProfile.Fill(longitudinalCoordInCm * convertCmToX0, convertADCToMeV * pParentCaloHit->GetInputEnergy());
-    }
-
-    // Expected longitudinal profile
-    Histogram expectedLongitudinalProfile(140, 0., 140.);
-
-    const float clusterEnergyInGeV(clusterEnergyInMeV / convertGeVToMeV);
-    const float longProfileCriticalEnergy(0.08f);
-    const float longProfileParameter0(1.25f);
-    const float longProfileParameter1(0.5f);
-
-    const double a(longProfileParameter0 + longProfileParameter1 * std::log(clusterEnergyInGeV / longProfileCriticalEnergy));
-    const double gammaA(std::exp(lgamma(a)));
-
-    float t(0.f);
-    for (int iBin = 0; iBin < expectedLongitudinalProfile.GetNBinsX(); ++iBin)
-    {
-        t += expectedLongitudinalProfile.GetXBinWidth();
-        expectedLongitudinalProfile.Fill(t, convertGeVToMeV * clusterEnergyInGeV / 2. * std::pow(t / 2.f, static_cast<float>(a - 1.)) *
-            std::exp(-t / 2.) * expectedLongitudinalProfile.GetXBinWidth() / gammaA);
-    }
-
-    return 1; //placeholder for fom
-
-}
-
-
-float ThreeDReclusteringAlgorithm::GetTransverseProfileFigureOfMerit(CaloHitList mergedClusterCaloHitList3D)
-{
-    // Begin with a PCA
-    CartesianVector centroid(0.f, 0.f, 0.f);
-    LArPcaHelper::EigenVectors eigenVecs;
-    LArPcaHelper::EigenValues eigenValues(0.f, 0.f, 0.f);
-    LArPcaHelper::RunPca(mergedClusterCaloHitList3D, centroid, eigenValues, eigenVecs);
-
-    // By convention, the primary axis has a positive z-component.
-    const CartesianVector axisDirection(eigenVecs.at(0).GetZ() > 0.f ? eigenVecs.at(0) : eigenVecs.at(0) * -1.f);
-
-    // Place intercept at hit with minimum projection
-    float minProjection(std::numeric_limits<float>::max());
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
-        minProjection = std::min(minProjection, axisDirection.GetDotProduct(pCaloHit3D->GetPositionVector() - centroid));
-
-    const CartesianVector axisIntercept(centroid + (axisDirection * minProjection));
-
-    // Now define ortho directions
-    const CartesianVector seedDirection((axisDirection.GetX() < std::min(axisDirection.GetY(), axisDirection.GetZ())) ? CartesianVector(1.f, 0.f, 0.f) :
-        (axisDirection.GetY() < std::min(axisDirection.GetX(), axisDirection.GetZ())) ? CartesianVector(0.f, 1.f, 0.f) : CartesianVector(0.f, 0.f, 1.f));
-    const CartesianVector orthoDirection1(seedDirection.GetCrossProduct(axisDirection).GetUnitVector());
-    const CartesianVector orthoDirection2(axisDirection.GetCrossProduct(orthoDirection1).GetUnitVector());
-
-    //Estimate total cluster energy
-    float clusterEnergyInMeV(0);
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D) clusterEnergyInMeV += pCaloHit3D->GetInputEnergy()*convertADCToMeV;
-
-    //Observed transverse profile
-    int transverseProfileNBins = 50;
-    float transverseProfileLow = -50;
-    float transverseProfileHigh = 50;
-    float transverseProfileBinSize = (transverseProfileHigh-transverseProfileLow)/transverseProfileNBins;
-    TwoDHistogram observedTransverseProfile(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
-
-    for (const CaloHit *const pCaloHit3D : mergedClusterCaloHitList3D)
-    {
-        const CartesianVector hitCoordinate(pCaloHit3D->GetPositionVector() - centroid);
-        const float position1(hitCoordinate.GetDotProduct(orthoDirection1));
-        const float position2(hitCoordinate.GetDotProduct(orthoDirection2));
-        observedTransverseProfile.Fill(position1, position2, pCaloHit3D->GetInputEnergy()); // Units: ADCs; note counting U, V and W parent hits here!
-    }
-
-    //Scale observed profile to total cluster energy
-    observedTransverseProfile.Scale(clusterEnergyInMeV/observedTransverseProfile.GetCumulativeSum());
-
-
-    //A 1 cluster expected profile
-    TwoDHistogram expectedTransverseProfile_oneShower(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
-    //Expected tranvserse profile (Grindhammer parametrisation)
-    for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
-    {
-        float profileX=transverseProfileLow+iBinX*transverseProfileBinSize;
-        for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
-        {
-           float profileY=transverseProfileLow+iBinY*transverseProfileBinSize;
-           float profileRadius=std::sqrt(profileX*profileX+profileY*profileY);
-           float profileValue=GetLateralProfileAtShowerMaximum(clusterEnergyInMeV,profileRadius);
-           expectedTransverseProfile_oneShower.SetBinContent(iBinX, iBinY, profileValue);
-        }
-    }
-    expectedTransverseProfile_oneShower.Scale(clusterEnergyInMeV/expectedTransverseProfile_oneShower.GetCumulativeSum());
-
-    //Now I want to calculate a 2 cluster expected profile, calculate FOM in both cases, and take the ratio, and this will be the final FOM
-    //A 1 cluster expected profile
-    TwoDHistogram expectedTransverseProfile_twoShowers(transverseProfileNBins, transverseProfileLow, transverseProfileHigh, transverseProfileNBins, transverseProfileLow, transverseProfileHigh);
-    //Expected tranvserse profile (Grindhammer parametrisation)
-    //Calculate figure of merit for this cluster
-    float squaredDiffSum(0);
-    for (int iBinX=0; iBinX<transverseProfileNBins; iBinX++) 
-    {
-        for (int iBinY=0; iBinY<transverseProfileNBins; iBinY++)
-        {
-          float diff = expectedTransverseProfile_oneShower.GetBinContent(iBinX, iBinY)-observedTransverseProfile.GetBinContent(iBinX,iBinY);
-          float squaredDiff = diff*diff;     
-          squaredDiffSum+=squaredDiff;
-        }
-    }
-    float figureOfMerit = squaredDiffSum/clusterEnergyInMeV;
-    return figureOfMerit;
 }
 
 //At the moment I only want to select showers with reasonably high impurity; this is to produce a training sample and to test on the most useful scenario
