@@ -10,7 +10,6 @@
 
 #include <torch/script.h>
 #include <torch/torch.h>
-//#include "torchsparse/sparse.h"
 
 #include "Pandora/StatusCodes.h"
 
@@ -45,7 +44,6 @@ public:
      *  @param  tensor the tensor to be initialised
      */
     static void InitialiseInput(const at::IntArrayRef dimensions, TorchInput &tensor);
-    static void InitialiseInput(const at::IntArrayRef dimensions, TorchInput &tensor, at::ScalarType type);
 
     /**
      *  @brief  Run a deep learning model

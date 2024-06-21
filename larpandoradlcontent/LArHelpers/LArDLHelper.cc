@@ -38,13 +38,6 @@ void LArDLHelper::InitialiseInput(const at::IntArrayRef dimensions, TorchInput &
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
-void LArDLHelper::InitialiseInput(const at::IntArrayRef dimensions, TorchInput &tensor, at::ScalarType type = at::kFloat)
-{
-    tensor = torch::zeros(dimensions,type);
-}
-
-//------------------------------------------------------------------------------------------------------------------------------------------
-
 void LArDLHelper::Forward(TorchModel &model, const TorchInputVector &input, TorchOutput &output)
 {
     output = model.forward(input).toTensor();
