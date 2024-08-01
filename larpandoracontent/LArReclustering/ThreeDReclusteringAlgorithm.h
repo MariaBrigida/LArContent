@@ -57,9 +57,11 @@ private:
     
     float GetFigureOfMerit(std::string figureOfMeritName, pandora::CaloHitList mergedClusterCaloHitList3D);
 
-    float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
+    //float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
+    float GetFigureOfMerit(std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
 
-    float GetFigureOfMerit(std::string figureOfMeritName, pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitLists3D);
+    //float GetFigureOfMerit(std::string figureOfMeritName, pandora::CaloHitList mergedClusterCaloHitList3D, std::vector<pandora::CaloHitList> newClustersCaloHitLists3D);
+    float GetFigureOfMerit(std::string figureOfMeritName, std::vector<pandora::CaloHitList> newClustersCaloHitLists3D);
 
     /** 
      *  @brief Use this to find cheated FOM by finding the shower purity as the fraction of hits that the main Mc particle is contributing to
@@ -68,7 +70,7 @@ private:
      */
     float GetCheatedFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
     
-    float GetCheatedFigureOfMerit(std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
+    //float GetCheatedFigureOfMerit(std::vector<pandora::CaloHitList> newClustersCaloHitList3D);
 
 
 

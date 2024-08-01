@@ -34,4 +34,4 @@ private:
 
 } // namespace lar_content
 
-#endif // #endif LAR_TRANSVERSE_CALO_RECLUSTERING_ALGORITHM_H
+#endif // #endif LAR_CHEATED_THREE_D_CLUSTERING_ALGORITHM_H

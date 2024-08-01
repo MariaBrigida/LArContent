@@ -58,7 +58,7 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
         //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
         const ClusterList *pShowerClusters(nullptr);
         PandoraContentApi::GetList(*this, "ShowerClusters3D", pShowerClusters);
-        if(!pShowerClusters) continue;
+        if(!pShowerClusters) return STATUS_CODE_NOT_FOUND;
 
 
         int iPfo(0); //for debug
@@ -72,6 +72,7 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
             if(!this->PassesCutsForReclustering(pShowerPfo))
             {
                 unchangedPfoList.push_back(pShowerPfo);
+				std::cout << "This pfo does not pass cuts for reclustering" << std::endl;
                 continue; // this function just checks it's a shower at the moment
             }
             std::cout << "DEBUG passed cuts for reclustering" << std::endl;
@@ -313,7 +314,8 @@ StatusCode ThreeDReclusteringAlgorithm::FindBestThreeDClusters(ClusterList clust
         std::sort (newClustersCaloHitLists3D.begin(), newClustersCaloHitLists3D.end(), sortByCaloHits);
         if(!newClustersCaloHitLists3D.size()) continue; 
         float mainClusterFraction = (float)newClustersCaloHitLists3D.front().size()/caloHitList3D.size();
-        float newFigureOfMerit = this->GetFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D); //Cheated FOM for group of new clusters is the minimum cheated FOM among those clusters
+        //float newFigureOfMerit = this->GetFigureOfMerit(caloHitList3D, newClustersCaloHitLists3D); //Cheated FOM for group of new clusters is the minimum cheated FOM among those clusters
+        float newFigureOfMerit = this->GetFigureOfMerit(newClustersCaloHitLists3D); //Cheated FOM for group of new clusters is the minimum cheated FOM among those clusters
         mainClusterFractionVector.push_back(mainClusterFraction);  ///watch out, these are in the loop over many algorithms! if I add more clustering algos I will need to differentiate the entries in these
 
         //Will print these for study/debug purposes
@@ -351,19 +353,29 @@ float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCal
 }
 
 
-float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritName, CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+//float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritName, CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::string figureOfMeritName, std::vector<CaloHitList> newClustersCaloHitLists3D)
 {
-    float figureOfMerit(-999);
-    if(figureOfMeritName=="cheated")figureOfMerit=this->GetCheatedFigureOfMerit(newClustersCaloHitLists3D);
-    return figureOfMerit;
+////    if(figureOfMeritName=="cheated")figureOfMerit=this->GetCheatedFigureOfMerit(mergedClusterCaloHitList3D, newClustersCaloHitLists3D);
+////    return figureOfMerit;
+      std::vector<float> newClustersFigureOfMeritVector;
+      for(auto clusterCaloHitLists3D: newClustersCaloHitLists3D)
+      {
+        if(figureOfMeritName=="cheated")newClustersFigureOfMeritVector.push_back(this->GetCheatedFigureOfMerit(clusterCaloHitLists3D));
+//        newClustersFigureOfMeritVector.push_back(this->GetFigureOfMerit(*iter,mergedClusterCaloHitList3D));
+      }
+      float figureOfMerit=*(std::min_element(newClustersFigureOfMeritVector.begin(), newClustersFigureOfMeritVector.end()));
+      return figureOfMerit;
 }
 
-float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+//float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCaloHitList3D, std::vector<CaloHitList> newClustersCaloHitLists3D)
+float ThreeDReclusteringAlgorithm::GetFigureOfMerit(std::vector<CaloHitList> newClustersCaloHitLists3D)
 {
     std::vector<float> figureOfMeritVector;
     for (StringVector::const_iterator iter = m_figureOfMeritNames.begin(), iterEnd = m_figureOfMeritNames.end(); iter != iterEnd; ++iter)
     {
-        figureOfMeritVector.push_back(this->GetFigureOfMerit(*iter,mergedClusterCaloHitList3D,newClustersCaloHitLists3D)); 
+        //figureOfMeritVector.push_back(this->GetFigureOfMerit(*iter,mergedClusterCaloHitList3D,newClustersCaloHitLists3D)); 
+        figureOfMeritVector.push_back(this->GetFigureOfMerit(*iter,newClustersCaloHitLists3D)); 
     }
     
     float figureOfMerit=*(std::min_element(figureOfMeritVector.begin(), figureOfMeritVector.end()));
@@ -440,32 +452,35 @@ int ThreeDReclusteringAlgorithm::GetMCParticleHierarchyTier(const pandora::MCPar
 
 
 
-float ThreeDReclusteringAlgorithm::GetCheatedFigureOfMerit(std::vector<CaloHitList> newClustersCaloHitLists3D)
-{
-    float minimumFigureOfMerit(999999);
-
-    for(CaloHitList newCaloHitList3D: newClustersCaloHitLists3D)
-    {
-        float currentFigureOfMerit = this->GetCheatedFigureOfMerit(newCaloHitList3D);
-        if(currentFigureOfMerit<minimumFigureOfMerit)minimumFigureOfMerit=currentFigureOfMerit;
-    }
-
-    return minimumFigureOfMerit;
-}
+//float ThreeDReclusteringAlgorithm::GetCheatedFigureOfMerit(std::vector<CaloHitList> newClustersCaloHitLists3D)
+//{
+//    float minimumFigureOfMerit(999999);
+//
+//    for(CaloHitList newCaloHitList3D: newClustersCaloHitLists3D)
+//    {
+//        float currentFigureOfMerit = this->GetCheatedFigureOfMerit(newCaloHitList3D);
+//        if(currentFigureOfMerit<minimumFigureOfMerit)minimumFigureOfMerit=currentFigureOfMerit;
+//    }
+//
+//    return minimumFigureOfMerit;
+//}
 
 //At the moment I only want to select showers with reasonably high impurity; this is to produce a training sample and to test on the most useful scenario
 //(In reality training stage I am even more restrictive: I ask that the 2nd most contributing particle contributes at least 30%. So the total impurity across all further contributions can be higher than this 30%. This is ok.
 bool ThreeDReclusteringAlgorithm::PassesCutsForReclustering(const pandora::ParticleFlowObject *const pShowerPfo)
 {
     if (!LArPfoHelper::IsShower(pShowerPfo)) return false;
+	std::cout << "It's a shower" << std::endl;
     ClusterList clusterList3D;
     LArPfoHelper::GetThreeDClusterList(pShowerPfo, clusterList3D);
 
     if (clusterList3D.empty()) return false;
+	std::cout << "Has 3D clusters" << std::endl;
     CaloHitList caloHitList3D;
     clusterList3D.front()->GetOrderedCaloHitList().FillCaloHitList(caloHitList3D);
     //Quality cuts
     if (caloHitList3D.size() < 2) return false;
+	std::cout << "Has more than 2 hits" << std::endl;
 
     //Some pfos are shower-like and yet include track-like 3D clusters. For the moment I don't want to deal with these.
     const ClusterList *pShowerClusters(nullptr);
@@ -473,7 +488,10 @@ bool ThreeDReclusteringAlgorithm::PassesCutsForReclustering(const pandora::Parti
     if(!pShowerClusters) return false;
     if(pShowerClusters->end() == std::find(pShowerClusters->begin(), pShowerClusters->end(), clusterList3D.front())) return false;
 
+	std::cout << "this->GetCheatedFigureOfMerit(caloHitList3D) = " << this->GetCheatedFigureOfMerit(caloHitList3D) << std::endl;
     if(this->GetCheatedFigureOfMerit(caloHitList3D)<0.3) return false; //30% impurity at least
+	std::cout << "At least 30% impurity" << std::endl;
+	
     return true;
 }
 
