@@ -67,7 +67,8 @@
 #include "larpandoracontent/LArPersistency/EventWritingAlgorithm.h"
 
 #include "larpandoracontent/LArPlugins/LArParticleIdPlugins.h"
-#include "larpandoracontent/LArReclustering/CheatedThreeDClusteringAlgorithm.h"
+#include "larpandoracontent/LArReclustering/CheatedThreeDClusteringTool.h"
+#include "larpandoracontent/LArReclustering/SimplePCAThreeDClusteringTool.h"
 
 #include "larpandoracontent/LArShowerRefinement/ConnectionPathwayFeatureTool.h"
 #include "larpandoracontent/LArShowerRefinement/ElectronInitialRegionRefinementAlgorithm.h"
@@ -335,10 +336,11 @@
     d("LArSvmVertexSelection",                  SvmVertexSelectionAlgorithm)                                                    \
     d("LArVertexRefinement",                    VertexRefinementAlgorithm)                                                      \
     d("LArThreeDReclustering",                  ThreeDReclusteringAlgorithm)                                                    \
-    d("LArCheatedThreeDClustering",             CheatedThreeDClusteringAlgorithm)                                            
 
 
 #define LAR_ALGORITHM_TOOL_LIST(d)                                                                                              \
+    d("LArCheatedThreeDClusteringTool",         CheatedThreeDClusteringTool)                                                    \
+    d("LArSimplePCAThreeDClusteringTool",                 SimplePCAThreeDClusteringTool)                                        \
     d("LArConnectionRegionFeatureTool",         ConnectionRegionFeatureTool)                                                    \
     d("LArShowerRegionFeatureTool",             ShowerRegionFeatureTool)                                                        \
     d("LArAmbiguousRegionFeatureTool",          AmbiguousRegionFeatureTool)                                                     \
