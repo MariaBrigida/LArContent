@@ -34,29 +34,22 @@ bool CheatedThreeDClusteringTool::Run(const Algorithm *const pAlgorithm, std::ve
 
     CaloHitList *initialCaloHitList = newCaloHitListsVector.at(0);
     newCaloHitListsVector.clear();
-    //std::cout << "initialCaloHitList.size() = " << initialCaloHitList->size() << std::endl;
     for (const CaloHit *const pCaloHit : *initialCaloHitList)
     {
-
         const CaloHit *const pParentCaloHit = static_cast<const CaloHit *>(pCaloHit->GetParentAddress());
 
         int mainMcParticleIndex = this->GetMainMcParticleIndex(pAlgorithm, pParentCaloHit);
-        //std::cout << "mainMcParticleIndex = " << mainMcParticleIndex << std::endl;
 
         // Flag to indicate if a matching list was found
         bool found = false;
 
         // Search for an existing list with matching MC particle index
-        //std::cout << "Currently, newCaloHitListsVector has " << newCaloHitListsVector.size() << " lists in it" << std::endl;
-
         for (CaloHitList *caloHitList : newCaloHitListsVector)
         {
             const CaloHit *const pListParentCaloHit = static_cast<const CaloHit *>(caloHitList->front()->GetParentAddress());
             int listMainMcParticleIndex = this->GetMainMcParticleIndex(pAlgorithm, pListParentCaloHit);
-            //std::cout << "listMainMcParticleIndex = " << listMainMcParticleIndex << std::endl;
             if (listMainMcParticleIndex == mainMcParticleIndex)
             {
-                //std::cout << "I found a matching list and it has size = " << caloHitList->size() << std::endl;
                 found = true;
                 caloHitList->push_back(pCaloHit);
                 break;
@@ -66,21 +59,10 @@ bool CheatedThreeDClusteringTool::Run(const Algorithm *const pAlgorithm, std::ve
         // If a list with matching MC particle hits is not found, create one
         if (!found)
         {
-            //std::cout << "need to make a new list. no match found" << std::endl;
             CaloHitList* newList = new CaloHitList();
             newList->push_back(pCaloHit);
             newCaloHitListsVector.push_back(newList);
         }
-    }
-
-    //DEBUG
-    int iList=0;
-    for (auto list: newCaloHitListsVector)
-    {
-        const CaloHit *const pParentCaloHitDebug = static_cast<const CaloHit *>(list->front()->GetParentAddress());
-        int   mainMcParticleIndexDebug = this->GetMainMcParticleIndex(pAlgorithm, pParentCaloHitDebug);
-        std::cout << "list nr. " << iList << " with size = " << list->size() << " main mc particle index for this list is: " << mainMcParticleIndexDebug << std::endl;
-        iList++;
     }
 
     return true;

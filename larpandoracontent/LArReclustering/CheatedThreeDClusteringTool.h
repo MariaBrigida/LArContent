@@ -25,10 +25,6 @@ public:
 
 private:
 
-    //pandora::StatusCode Run();
-
-    //bool Run(ThreeDReclusteringAlgorithm *const pAlgorithm, std::vector<pandora::CaloHitList> &newCaloHitListsVector);
-    //virtual bool Run(std::vector<pandora::CaloHitList> &newCaloHitListsVector) = 0;
     bool Run(const pandora::Algorithm *const pAlgorithm, std::vector<pandora::CaloHitList*> &newCaloHitListsVector) override;
 
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
