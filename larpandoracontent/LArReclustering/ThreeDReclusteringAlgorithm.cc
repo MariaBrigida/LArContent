@@ -373,8 +373,8 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
             PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, newPfoListName, m_newPfosListNameAllAfterReclustering));
             //std::cout << "debug 10 " << std::endl;
 
-            iPfo++;
         }
+        iPfo++;
     }
         if(unchangedPfoList.size()>0) PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<PfoList>(*this, "ShowerParticles3D", m_newPfosListNameAllAfterReclustering,  unchangedPfoList));
         const PfoList *pNewPfosListAllAfterReclustering;
