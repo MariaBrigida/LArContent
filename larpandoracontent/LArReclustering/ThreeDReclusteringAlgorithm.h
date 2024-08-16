@@ -106,7 +106,7 @@ private:
     int GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle);
 
     //This can then go in the SDK with the name/format PandoraContentApi::RebuildLArTPCPfo(Algorithm &, Pfo  *pPfoToRebuild, Cluster *pTemplate3DCluster, MapOfListNameInfo &)
-     pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild, const pandora::ClusterList *newThreeDClusters); 
+     pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList *newThreeDClusters); 
 
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
 

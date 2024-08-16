@@ -16,12 +16,6 @@
 
 #include "larpandoracontent/LArReclustering/ThreeDReclusteringAlgorithm.h"
 
-const float convertADCToMeV = 0.0075;
-const int atomicNumberArgon = 18;
-const float atomicMassArgon = 39.948;
-const float criticalEnergyArgon = 32.84;
-const float moliereRadiusCmArgon = 9.043; //cm
-
 bool sortByCaloHits (pandora::CaloHitList a, pandora::CaloHitList b) { return (a.size()>b.size()); }
 
 using namespace pandora;
@@ -201,177 +195,9 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndFragmentation(*this, clusterListToSaveName, clusterListToDeleteName));
                //std::cout << "newClustersList size = " << newClustersList.size() << std::endl;
 
-            //Then I want to build new pfos, taking care of 2D hits as well
-            //std::cout << "Now I want to make 2D clusters" << std::endl;
-            ClusterList clusterList2D;
-            LArPfoHelper::GetTwoDClusterList(pShowerPfo, clusterList2D);
-            std::map<int,const Cluster*> newClustersUMap, newClustersVMap,newClustersWMap;
 
-            for(const Cluster *const pTwoDCluster : clusterList2D)
-            {
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RemoveFromPfo(*this, pShowerPfo, pTwoDCluster));
-                HitType hitType = LArClusterHelper::GetClusterHitType(pTwoDCluster);
-                std::string clusterListName(hitType == TPC_VIEW_U ? "ClustersU" : hitType == TPC_VIEW_V ? "ClustersV" : "ClustersW");
+               PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, this->RebuildPfo(pShowerPfo, &newClustersList));
 
-                std::string initialListName="";//, debugListName="";
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, initialListName));
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, clusterListName));
-
-                // Fragmentation initialisation
-                std::string originalListName, fragmentListName;
-                ClusterList originalClusterList;
-                originalClusterList.push_back(pTwoDCluster);
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::InitializeFragmentation(*this, originalClusterList, originalListName, fragmentListName));
-         
-                const OrderedCaloHitList &twoDClusterOrderedCaloHitList(pTwoDCluster->GetOrderedCaloHitList());
-                OrderedCaloHitList leftoverCaloHitList = twoDClusterOrderedCaloHitList;
-         
-                int iCluster(0);
-                for(const Cluster *pNewCluster : newClustersList)
-                {
-             		if (!pNewCluster)
-           			{
-                 		  std::cerr << "DEBUG, Error: pNewCluster is null!" << std::endl;
-               			  continue;
-          			}
-                    PandoraContentApi::Cluster::Parameters parameters;
-                    CaloHitList newClusterCaloHitList3D;
-                    pNewCluster->GetOrderedCaloHitList().FillCaloHitList(newClusterCaloHitList3D); 
-                    //std::cout << "pNewCluster->GetOrderedCaloHitList() size = " << pNewCluster->GetOrderedCaloHitList().size() << std::endl;
-         
-                    for(const CaloHit *const p3DCaloHit : newClusterCaloHitList3D)
-                    {
-                        for (const OrderedCaloHitList::value_type &mapEntry : twoDClusterOrderedCaloHitList)
-                        {
-                            for (const CaloHit *const pCaloHit : *mapEntry.second)
-                            {
-                                if(pCaloHit==static_cast<const CaloHit *>(p3DCaloHit->GetParentAddress())) 
-                                {
-                                  parameters.m_caloHitList.push_back(static_cast<const CaloHit *>(pCaloHit));
-                                  leftoverCaloHitList.Remove(pCaloHit);
-                                }
-                            }
-                        }
-                    }
-                    //std::cout << "debug 0" << std::endl;
-                    const Cluster *pNewTwoDCluster(nullptr);
-                    if (!parameters.m_caloHitList.empty())
-                    {
-                        //std::cout << "Making a new 2D cluster with hitType = " << hitType << std::endl;
-                        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::Cluster::Create(*this, parameters, pNewTwoDCluster));
-                    }
-                    //PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), &parameters.m_caloHitList, "_" + hitType, RED));
-                    //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
-                    //std::cout << "debug 1" << std::endl;
-                    if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_U) {newClustersUMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
-                    else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_V) {newClustersVMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
-                    else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_W) {newClustersWMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
-                    //std::cout << "debug 2" << std::endl;
-                    
-                    iCluster++;
-                }
-                //PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &clusterListVDebug, "2DClustersBeforeMakingPfo_V", RED));
-                //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
-
-                //std::cout << "debug 3" << std::endl;
-                
-                //Check the leftover caloHits. Attach to the nearest cluster in the new cluster list (newClustersUVect, newClustersVVect or newClustersWVect?
-                std::map<int,const Cluster*> clustersForLeftoverHitsMap;
-                if(hitType==TPC_VIEW_U) clustersForLeftoverHitsMap = newClustersUMap;
-                else if(hitType==TPC_VIEW_V) clustersForLeftoverHitsMap = newClustersVMap;
-                else if(hitType==TPC_VIEW_W) clustersForLeftoverHitsMap = newClustersWMap;
-                if(clustersForLeftoverHitsMap.size())  //THE QUESTION REMAINS OF WHAT TO DO WITH LEFTOVER HITS IF TEHRE IS NO CLUSTER TO ATTACH THEM TO (THIS CONDITION FAILS)!!!
-                {
-                for(const OrderedCaloHitList::value_type &mapEntry : leftoverCaloHitList)
-                    {
-                        for (const CaloHit *const pCaloHit : *mapEntry.second)
-                        {
-                            const Cluster* pNearestCluster = nullptr;
-                            double minimumDistance(std::numeric_limits<float>::max());
-                            for(const auto & [clusterIndex, pNewTwoDCluster] : clustersForLeftoverHitsMap)
-                            {
-                                double dist = LArClusterHelper::GetClosestDistance(pCaloHit->GetPositionVector(), pNewTwoDCluster);  
-                                if (dist<minimumDistance)
-                                {
-                                    minimumDistance=dist;
-                                    pNearestCluster=pNewTwoDCluster;
-                                }
-                            }
-                            PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::AddToCluster(*this,pNearestCluster,pCaloHit));
-                        }
-                    }
-                }
-
-
-               //std::cout << "pre frag isAvailableU = " << isAvailableU << " isAvailableV = " << isAvailableV << " isAvailableW = " << isAvailableW << std::endl;
-                //std::cout << "debug 5 " << std::endl;
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndFragmentation(*this, fragmentListName, originalListName));
-                //std::cout << "debug 6 " << std::endl;
-                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, initialListName));
-                //std::cout << "debug 7 " << std::endl;
-
-
-            //Now I want to clear the lists and vector to avoid memory leaks
-                // Delete the CaloHitList objects after processing
-            /*for (CaloHitList* caloHitList : newCaloHitListsVector)
-            {
-                delete caloHitList;  // Clean up the memory
-            }
-            */
-               newCaloHitListsVector.clear();  // Clear the vector to avoid dangling pointers
-            }
-
-            //Making new Pfos
-            const PfoList *pNewPfoList(nullptr);
-            std::string newPfoListName = "changedShowerParticles3D";
-            PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::CreateTemporaryListAndSetCurrent(*this, pNewPfoList, newPfoListName));
-            //std::cout << "debug 8 " << std::endl;
-         
-            std::string originalClusterListName="InitialCluster";
-            int iCluster(0);
-        
-            //std::cout << "About to create new pfos. newClustersList.size() = " << newClustersList.size() << std::endl; 
-            //ClusterList twoDClusterList;
-            for(const Cluster *pNewThreeDCluster : newClustersList)
-            {
-                    PandoraContentApi::ParticleFlowObject::Parameters pfoParameters;
-                    const bool isAvailableU((newClustersUMap.count(iCluster)) && newClustersUMap.at(iCluster)->IsAvailable());
-                    const bool isAvailableV((newClustersVMap.count(iCluster)) && newClustersVMap.at(iCluster)->IsAvailable());
-                    const bool isAvailableW((newClustersWMap.count(iCluster)) && newClustersWMap.at(iCluster)->IsAvailable());
-                    //std::cout << "isAvailableU = " << isAvailableU << " isAvailableV = " << isAvailableV << " isAvailableW = " << isAvailableW << std::endl;
-                    CaloHitList clusterUHits, clusterVHits, clusterWHits;
-                    if(isAvailableU)newClustersUMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterUHits);
-                    if(isAvailableV)newClustersVMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterVHits);
-                    if(isAvailableW)newClustersWMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterWHits);
-                    if(isAvailableU) pfoParameters.m_clusterList.push_back(newClustersUMap.at(iCluster));
-                    if(isAvailableV) pfoParameters.m_clusterList.push_back(newClustersVMap.at(iCluster));
-                    if(isAvailableW) pfoParameters.m_clusterList.push_back(newClustersWMap.at(iCluster));
-
-
-                    pfoParameters.m_clusterList.push_back(pNewThreeDCluster);
-         
-                    pfoParameters.m_particleId = pShowerPfo->GetParticleId(); // SHOWER, placeholder for now... Are the new clusters all showers???
-                    pfoParameters.m_charge = PdgTable::GetParticleCharge(pfoParameters.m_particleId.Get());
-                    pfoParameters.m_mass = PdgTable::GetParticleMass(pfoParameters.m_particleId.Get());
-                    pfoParameters.m_energy = 0.f;
-                    pfoParameters.m_momentum = CartesianVector(0.f, 0.f, 0.f);
-         
-                    const ParticleFlowObject *pNewPfo(nullptr);
-                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ParticleFlowObject::Create(*this, pfoParameters, pNewPfo));
-         
-                    //ClusterList newClusterList2D;
-                    //LArPfoHelper::GetTwoDClusterList(pNewPfo, newClusterList2D);
-                    //twoDClusterList.insert(twoDClusterList.end(),newClusterList2D.begin(),newClusterList2D.end());
-        
-                    iCluster++;
-                    
-            }
-            //PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &twoDClusterList, "twoDClusterList", RED));
-            //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
-
-            //std::cout << "debug 9 " << std::endl;
-            PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, newPfoListName, m_newPfosListNameAllAfterReclustering));
-            //std::cout << "debug 10 " << std::endl;
 
         }
         iPfo++;
@@ -515,6 +341,187 @@ float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCal
     return figureOfMerit;
 }
 
+
+StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, ClusterList *newClustersList)
+{
+   ///START OF REBUILD PFO///////////////////////////
+
+    //Then I want to build new pfos, taking care of 2D hits as well
+    //std::cout << "Now I want to make 2D clusters" << std::endl;
+    ClusterList clusterList2D;
+    LArPfoHelper::GetTwoDClusterList(pPfoToRebuild, clusterList2D);
+    std::map<int,const Cluster*> newClustersUMap, newClustersVMap,newClustersWMap;
+
+    for(const Cluster *const pTwoDCluster : clusterList2D)
+    {
+        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::RemoveFromPfo(*this, pPfoToRebuild, pTwoDCluster));
+        HitType hitType = LArClusterHelper::GetClusterHitType(pTwoDCluster);
+        std::string clusterListName(hitType == TPC_VIEW_U ? "ClustersU" : hitType == TPC_VIEW_V ? "ClustersV" : "ClustersW");
+
+        std::string initialListName="";//, debugListName="";
+        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::GetCurrentListName<Cluster>(*this, initialListName));
+        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, clusterListName));
+
+        // Fragmentation initialisation
+        std::string originalListName, fragmentListName;
+        ClusterList originalClusterList;
+        originalClusterList.push_back(pTwoDCluster);
+        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::InitializeFragmentation(*this, originalClusterList, originalListName, fragmentListName));
+ 
+        const OrderedCaloHitList &twoDClusterOrderedCaloHitList(pTwoDCluster->GetOrderedCaloHitList());
+        OrderedCaloHitList leftoverCaloHitList = twoDClusterOrderedCaloHitList;
+ 
+        int iCluster(0);
+        for(const Cluster *pNewCluster : *newClustersList)
+        {
+     		if (!pNewCluster)
+   			{
+         		  std::cerr << "DEBUG, Error: pNewCluster is null!" << std::endl;
+       			  continue;
+  			}
+            PandoraContentApi::Cluster::Parameters parameters;
+            CaloHitList newClusterCaloHitList3D;
+            pNewCluster->GetOrderedCaloHitList().FillCaloHitList(newClusterCaloHitList3D); 
+            //std::cout << "pNewCluster->GetOrderedCaloHitList() size = " << pNewCluster->GetOrderedCaloHitList().size() << std::endl;
+ 
+            for(const CaloHit *const p3DCaloHit : newClusterCaloHitList3D)
+            {
+                for (const OrderedCaloHitList::value_type &mapEntry : twoDClusterOrderedCaloHitList)
+                {
+                    for (const CaloHit *const pCaloHit : *mapEntry.second)
+                    {
+                        if(pCaloHit==static_cast<const CaloHit *>(p3DCaloHit->GetParentAddress())) 
+                        {
+                          parameters.m_caloHitList.push_back(static_cast<const CaloHit *>(pCaloHit));
+                          leftoverCaloHitList.Remove(pCaloHit);
+                        }
+                    }
+                }
+            }
+            //std::cout << "debug 0" << std::endl;
+            const Cluster *pNewTwoDCluster(nullptr);
+            if (!parameters.m_caloHitList.empty())
+            {
+                //std::cout << "Making a new 2D cluster with hitType = " << hitType << std::endl;
+                PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::Cluster::Create(*this, parameters, pNewTwoDCluster));
+            }
+            //PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), &parameters.m_caloHitList, "_" + hitType, RED));
+            //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
+            //std::cout << "debug 1" << std::endl;
+            if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_U) {newClustersUMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
+            else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_V) {newClustersVMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
+            else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_W) {newClustersWMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
+            //std::cout << "debug 2" << std::endl;
+            
+            iCluster++;
+        }
+        //PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &clusterListVDebug, "2DClustersBeforeMakingPfo_V", RED));
+        //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
+
+        //std::cout << "debug 3" << std::endl;
+        
+        //Check the leftover caloHits. Attach to the nearest cluster in the new cluster list (newClustersUVect, newClustersVVect or newClustersWVect?
+        std::map<int,const Cluster*> clustersForLeftoverHitsMap;
+        if(hitType==TPC_VIEW_U) clustersForLeftoverHitsMap = newClustersUMap;
+        else if(hitType==TPC_VIEW_V) clustersForLeftoverHitsMap = newClustersVMap;
+        else if(hitType==TPC_VIEW_W) clustersForLeftoverHitsMap = newClustersWMap;
+        if(clustersForLeftoverHitsMap.size())  //THE QUESTION REMAINS OF WHAT TO DO WITH LEFTOVER HITS IF TEHRE IS NO CLUSTER TO ATTACH THEM TO (THIS CONDITION FAILS)!!!
+        {
+        for(const OrderedCaloHitList::value_type &mapEntry : leftoverCaloHitList)
+            {
+                for (const CaloHit *const pCaloHit : *mapEntry.second)
+                {
+                    const Cluster* pNearestCluster = nullptr;
+                    double minimumDistance(std::numeric_limits<float>::max());
+                    for(const auto & [clusterIndex, pNewTwoDCluster] : clustersForLeftoverHitsMap)
+                    {
+                        double dist = LArClusterHelper::GetClosestDistance(pCaloHit->GetPositionVector(), pNewTwoDCluster);  
+                        if (dist<minimumDistance)
+                        {
+                            minimumDistance=dist;
+                            pNearestCluster=pNewTwoDCluster;
+                        }
+                    }
+                    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::AddToCluster(*this,pNearestCluster,pCaloHit));
+                }
+            }
+        }
+
+
+       //std::cout << "pre frag isAvailableU = " << isAvailableU << " isAvailableV = " << isAvailableV << " isAvailableW = " << isAvailableW << std::endl;
+        //std::cout << "debug 5 " << std::endl;
+        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndFragmentation(*this, fragmentListName, originalListName));
+        //std::cout << "debug 6 " << std::endl;
+        PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ReplaceCurrentList<Cluster>(*this, initialListName));
+        //std::cout << "debug 7 " << std::endl;
+
+
+    //Now I want to clear the lists and vector to avoid memory leaks
+        // Delete the CaloHitList objects after processing
+    /*for (CaloHitList* caloHitList : newCaloHitListsVector)
+    {
+        delete caloHitList;  // Clean up the memory
+    }
+    */
+       //newCaloHitListsVector.clear();  // Clear the vector to avoid dangling pointers
+    }
+
+    //Making new Pfos
+    const PfoList *pNewPfoList(nullptr);
+    std::string newPfoListName = "changedShowerParticles3D";
+    PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::CreateTemporaryListAndSetCurrent(*this, pNewPfoList, newPfoListName));
+    //std::cout << "debug 8 " << std::endl;
+ 
+    std::string originalClusterListName="InitialCluster";
+    int iCluster(0);
+
+    //std::cout << "About to create new pfos. newClustersList.size() = " << newClustersList.size() << std::endl; 
+    //ClusterList twoDClusterList;
+    for(const Cluster *pNewThreeDCluster : *newClustersList)
+    {
+            PandoraContentApi::ParticleFlowObject::Parameters pfoParameters;
+            const bool isAvailableU((newClustersUMap.count(iCluster)) && newClustersUMap.at(iCluster)->IsAvailable());
+            const bool isAvailableV((newClustersVMap.count(iCluster)) && newClustersVMap.at(iCluster)->IsAvailable());
+            const bool isAvailableW((newClustersWMap.count(iCluster)) && newClustersWMap.at(iCluster)->IsAvailable());
+            //std::cout << "isAvailableU = " << isAvailableU << " isAvailableV = " << isAvailableV << " isAvailableW = " << isAvailableW << std::endl;
+            CaloHitList clusterUHits, clusterVHits, clusterWHits;
+            if(isAvailableU)newClustersUMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterUHits);
+            if(isAvailableV)newClustersVMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterVHits);
+            if(isAvailableW)newClustersWMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterWHits);
+            if(isAvailableU) pfoParameters.m_clusterList.push_back(newClustersUMap.at(iCluster));
+            if(isAvailableV) pfoParameters.m_clusterList.push_back(newClustersVMap.at(iCluster));
+            if(isAvailableW) pfoParameters.m_clusterList.push_back(newClustersWMap.at(iCluster));
+
+
+            pfoParameters.m_clusterList.push_back(pNewThreeDCluster);
+ 
+            pfoParameters.m_particleId = pPfoToRebuild->GetParticleId(); // SHOWER, placeholder for now... Are the new clusters all showers???
+            pfoParameters.m_charge = PdgTable::GetParticleCharge(pfoParameters.m_particleId.Get());
+            pfoParameters.m_mass = PdgTable::GetParticleMass(pfoParameters.m_particleId.Get());
+            pfoParameters.m_energy = 0.f;
+            pfoParameters.m_momentum = CartesianVector(0.f, 0.f, 0.f);
+ 
+            const ParticleFlowObject *pNewPfo(nullptr);
+            PANDORA_THROW_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::ParticleFlowObject::Create(*this, pfoParameters, pNewPfo));
+ 
+            //ClusterList newClusterList2D;
+            //LArPfoHelper::GetTwoDClusterList(pNewPfo, newClusterList2D);
+            //twoDClusterList.insert(twoDClusterList.end(),newClusterList2D.begin(),newClusterList2D.end());
+
+            iCluster++;
+            
+    }
+    //PANDORA_MONITORING_API(VisualizeClusters(this->GetPandora(), &twoDClusterList, "twoDClusterList", RED));
+    //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
+
+    //std::cout << "debug 9 " << std::endl;
+    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::SaveList<Pfo>(*this, newPfoListName, m_newPfosListNameAllAfterReclustering));
+    //std::cout << "debug 10 " << std::endl;
+
+        /////////////////////////////// END OF REBUILD PFO
+
+   return STATUS_CODE_SUCCESS;
+}
 
 StatusCode ThreeDReclusteringAlgorithm::ReadSettings(const TiXmlHandle xmlHandle)
 {
