@@ -181,7 +181,7 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
 
 
                //ClusterVector clusterVector;
-               ClusterList newClustersList;
+               //ClusterList newClustersList;
                for(auto list: minimumFigureOfMeritCaloHitListsVector)
                {
                    //std::cout << "list size = " << list->size() << std::endl;
@@ -189,14 +189,15 @@ StatusCode ThreeDReclusteringAlgorithm::Run()
                    PandoraContentApi::Cluster::Parameters parameters;
                    parameters.m_caloHitList = *list;
                    PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::Cluster::Create(*this, parameters, pCluster));
-                   newClustersList.push_back(pCluster);
+                   m_newClustersList.push_back(pCluster);
                }
 
                PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, PandoraContentApi::EndFragmentation(*this, clusterListToSaveName, clusterListToDeleteName));
                //std::cout << "newClustersList size = " << newClustersList.size() << std::endl;
 
 
-               PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, this->RebuildPfo(pShowerPfo, &newClustersList));
+               //PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, this->RebuildPfo(pShowerPfo, m_newClustersList));
+               PANDORA_RETURN_RESULT_IF(STATUS_CODE_SUCCESS, !=, this->RebuildPfo(pShowerPfo));
 
 
         }
@@ -342,15 +343,24 @@ float ThreeDReclusteringAlgorithm::GetFigureOfMerit(CaloHitList mergedClusterCal
 }
 
 
-StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, ClusterList *newClustersList)
+StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild)
 {
-   ///START OF REBUILD PFO///////////////////////////
+   m_newClustersUMap.clear();  
+   m_newClustersVMap.clear();  
+   m_newClustersWMap.clear();  
+ 
+   this->BuildNewTwoDClusters(pPfoToRebuild);
+   this->BuildNewPfos(pPfoToRebuild);
 
-    //Then I want to build new pfos, taking care of 2D hits as well
+   return STATUS_CODE_SUCCESS;
+}
+
+StatusCode ThreeDReclusteringAlgorithm::BuildNewTwoDClusters(const Pfo *pPfoToRebuild){
+
     //std::cout << "Now I want to make 2D clusters" << std::endl;
     ClusterList clusterList2D;
     LArPfoHelper::GetTwoDClusterList(pPfoToRebuild, clusterList2D);
-    std::map<int,const Cluster*> newClustersUMap, newClustersVMap,newClustersWMap;
+    //std::map<int,const Cluster*> newClustersUMap, newClustersVMap,newClustersWMap;
 
     for(const Cluster *const pTwoDCluster : clusterList2D)
     {
@@ -372,7 +382,7 @@ StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, Clu
         OrderedCaloHitList leftoverCaloHitList = twoDClusterOrderedCaloHitList;
  
         int iCluster(0);
-        for(const Cluster *pNewCluster : *newClustersList)
+        for(const Cluster *pNewCluster : m_newClustersList)
         {
      		if (!pNewCluster)
    			{
@@ -408,9 +418,9 @@ StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, Clu
             //PANDORA_MONITORING_API(VisualizeCaloHits(this->GetPandora(), &parameters.m_caloHitList, "_" + hitType, RED));
             //PANDORA_MONITORING_API(ViewEvent(this->GetPandora()));
             //std::cout << "debug 1" << std::endl;
-            if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_U) {newClustersUMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
-            else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_V) {newClustersVMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
-            else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_W) {newClustersWMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
+            if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_U) {m_newClustersUMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
+            else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_V) {m_newClustersVMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
+            else if(pNewTwoDCluster!=nullptr && !parameters.m_caloHitList.empty() && hitType==TPC_VIEW_W) {m_newClustersWMap.insert(std::make_pair(iCluster,pNewTwoDCluster));}
             //std::cout << "debug 2" << std::endl;
             
             iCluster++;
@@ -422,9 +432,9 @@ StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, Clu
         
         //Check the leftover caloHits. Attach to the nearest cluster in the new cluster list (newClustersUVect, newClustersVVect or newClustersWVect?
         std::map<int,const Cluster*> clustersForLeftoverHitsMap;
-        if(hitType==TPC_VIEW_U) clustersForLeftoverHitsMap = newClustersUMap;
-        else if(hitType==TPC_VIEW_V) clustersForLeftoverHitsMap = newClustersVMap;
-        else if(hitType==TPC_VIEW_W) clustersForLeftoverHitsMap = newClustersWMap;
+        if(hitType==TPC_VIEW_U) clustersForLeftoverHitsMap = m_newClustersUMap;
+        else if(hitType==TPC_VIEW_V) clustersForLeftoverHitsMap = m_newClustersVMap;
+        else if(hitType==TPC_VIEW_W) clustersForLeftoverHitsMap = m_newClustersWMap;
         if(clustersForLeftoverHitsMap.size())  //THE QUESTION REMAINS OF WHAT TO DO WITH LEFTOVER HITS IF TEHRE IS NO CLUSTER TO ATTACH THEM TO (THIS CONDITION FAILS)!!!
         {
         for(const OrderedCaloHitList::value_type &mapEntry : leftoverCaloHitList)
@@ -465,7 +475,11 @@ StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, Clu
     */
        //newCaloHitListsVector.clear();  // Clear the vector to avoid dangling pointers
     }
+   return STATUS_CODE_SUCCESS;
 
+}
+
+StatusCode ThreeDReclusteringAlgorithm::BuildNewPfos(const Pfo *pPfoToRebuild){
     //Making new Pfos
     const PfoList *pNewPfoList(nullptr);
     std::string newPfoListName = "changedShowerParticles3D";
@@ -477,20 +491,20 @@ StatusCode ThreeDReclusteringAlgorithm::RebuildPfo(const Pfo *pPfoToRebuild, Clu
 
     //std::cout << "About to create new pfos. newClustersList.size() = " << newClustersList.size() << std::endl; 
     //ClusterList twoDClusterList;
-    for(const Cluster *pNewThreeDCluster : *newClustersList)
+    for(const Cluster *pNewThreeDCluster : m_newClustersList)
     {
             PandoraContentApi::ParticleFlowObject::Parameters pfoParameters;
-            const bool isAvailableU((newClustersUMap.count(iCluster)) && newClustersUMap.at(iCluster)->IsAvailable());
-            const bool isAvailableV((newClustersVMap.count(iCluster)) && newClustersVMap.at(iCluster)->IsAvailable());
-            const bool isAvailableW((newClustersWMap.count(iCluster)) && newClustersWMap.at(iCluster)->IsAvailable());
+            const bool isAvailableU((m_newClustersUMap.count(iCluster)) && m_newClustersUMap.at(iCluster)->IsAvailable());
+            const bool isAvailableV((m_newClustersVMap.count(iCluster)) && m_newClustersVMap.at(iCluster)->IsAvailable());
+            const bool isAvailableW((m_newClustersWMap.count(iCluster)) && m_newClustersWMap.at(iCluster)->IsAvailable());
             //std::cout << "isAvailableU = " << isAvailableU << " isAvailableV = " << isAvailableV << " isAvailableW = " << isAvailableW << std::endl;
             CaloHitList clusterUHits, clusterVHits, clusterWHits;
-            if(isAvailableU)newClustersUMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterUHits);
-            if(isAvailableV)newClustersVMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterVHits);
-            if(isAvailableW)newClustersWMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterWHits);
-            if(isAvailableU) pfoParameters.m_clusterList.push_back(newClustersUMap.at(iCluster));
-            if(isAvailableV) pfoParameters.m_clusterList.push_back(newClustersVMap.at(iCluster));
-            if(isAvailableW) pfoParameters.m_clusterList.push_back(newClustersWMap.at(iCluster));
+            if(isAvailableU) m_newClustersUMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterUHits);
+            if(isAvailableV) m_newClustersVMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterVHits);
+            if(isAvailableW) m_newClustersWMap.at(iCluster)->GetOrderedCaloHitList().FillCaloHitList(clusterWHits);
+            if(isAvailableU) pfoParameters.m_clusterList.push_back(m_newClustersUMap.at(iCluster));
+            if(isAvailableV) pfoParameters.m_clusterList.push_back(m_newClustersVMap.at(iCluster));
+            if(isAvailableW) pfoParameters.m_clusterList.push_back(m_newClustersWMap.at(iCluster));
 
 
             pfoParameters.m_clusterList.push_back(pNewThreeDCluster);

@@ -1,11 +1,10 @@
 /**
  *  @file   larpandoracontent/LArReclustering/ThreeDReclusteringAlgorithm.h
  *
- *  @brief  Header file for the reclustering algorithm that runs other algs.
+ *  @brief  Header file for the 3D reclustering algorithm class.
  *
  *  $Log: $
  */
-
 #ifndef LAR_THREE_D_RECLUSTERING_ALGORITHM_H
 #define LAR_THREE_D_RECLUSTERING_ALGORITHM_H 1
 
@@ -16,49 +15,40 @@ namespace lar_content
 
  class ClusteringTool; 
  
- /**
-  *  @brief  RecursivePfoMopUpAlgorithm class
-  */
- class ThreeDReclusteringAlgorithm : public pandora::Algorithm
- {
- public:
-     /**
-      *  @brief  Default constructor
-      */
+//------------------------------------------------------------------------------------------------------------------------------------------
+
+/**
+ *  @brief ThreeDReclusteringAlgorithm class
+ */
+class ThreeDReclusteringAlgorithm : public pandora::Algorithm
+{
+public:
+    /**
+     *  @brief  Default constructor
+     */
     ThreeDReclusteringAlgorithm();
 
-   /**
-    *  @brief  Destructor
-    */
+    /**
+     *  @brief  Destructor
+     */
     ~ThreeDReclusteringAlgorithm();
 
 private:
-
+    /**
+     *  @brief  Run the algorithm
+     */
     pandora::StatusCode Run();
 
-    typedef std::vector<ClusteringTool *> ClusteringToolVector;
-    ClusteringToolVector m_algorithmToolVector; ///< The algorithm tool vector
 
     /**
-     *  @brief 
+     *  @brief Find the calo hit configuration that yields the best 3D clusters according to the chosen metric 
      *
-     *  @param 
+     *  @param clusterList3D 
+     *  @param minimumFigureOfMeritClusterListName
      *
      *  @return List of 
      */
-    //pandora::StatusCode FindBestThreeDClusters(pandora::ClusterList clusterList3D, std::string &reclusterListName, pandora::ClusterList &minimumFigureOfMeritClusterList);
-    pandora::StatusCode FindBestThreeDClusters(pandora::ClusterList clusterList3D, std::string minimumFigureOfMeritClusterListName);
-
-    /**
-     *  @brief Get the theoretical lateral profile value at the shower maximum for a given energy and radius (Grindhammer)
-     *
-     *  @param energy the cluster energy in MeV
-     *  @param radiusInCm the radius at which to calculate the profile value
-     *
-     *  @return List of PfoMergeStats for each Pfo
-     */
-    float GetLateralProfileAtShowerMaximum(float clusterEnergyInMeV, float radiusInCm);
-
+    //pandora::StatusCode FindBestThreeDClusters(pandora::ClusterList clusterList3D, std::string minimumFigureOfMeritClusterListName);
 
     float GetFigureOfMerit(pandora::CaloHitList mergedClusterCaloHitList3D);
     
@@ -106,9 +96,18 @@ private:
     int GetMCParticleHierarchyTier(const pandora::MCParticle *const pMCParticle);
 
     //This can then go in the SDK with the name/format PandoraContentApi::RebuildLArTPCPfo(Algorithm &, Pfo  *pPfoToRebuild, Cluster *pTemplate3DCluster, MapOfListNameInfo &)
-     pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList *newThreeDClusters); 
+     //pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList *newThreeDClusters); 
+     pandora::StatusCode RebuildPfo(const pandora::Pfo *pPfoToRebuild); 
+     //pandora::StatusCode BuildNewTwoDClusters(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList *newThreeDClusters); 
+     pandora::StatusCode BuildNewTwoDClusters(const pandora::Pfo *pPfoToRebuild); 
+     //pandora::StatusCode BuildNewPfos(const pandora::Pfo *pPfoToRebuild, pandora::ClusterList *newThreeDClusters); 
+     pandora::StatusCode BuildNewPfos(const pandora::Pfo *pPfoToRebuild); 
 
     pandora::StatusCode ReadSettings(const pandora::TiXmlHandle xmlHandle);
+
+
+    typedef std::vector<ClusteringTool *> ClusteringToolVector;
+    ClusteringToolVector m_algorithmToolVector; ///< The algorithm tool vector
 
     std::string m_pfoListName; ///< The input pfo list name (e.g. list of neutrino or testbeam pfos)
     pandora::StringVector m_figureOfMeritNames; ///what figure(s) of merit to use
@@ -117,6 +116,11 @@ private:
     int m_hitThresholdForNewPfo; //Minimum nr. of hits to form new 3Dcluster and pfo
     pandora::StringVector   m_clusteringAlgorithms; ///< The ordered list of clustering algorithms to be used
     std::string m_mcParticleListName; ///< The mc particle list name 
+    
+    std::map<int, const pandora::Cluster*> m_newClustersUMap;
+    std::map<int, const pandora::Cluster*> m_newClustersVMap;
+    std::map<int, const pandora::Cluster*> m_newClustersWMap;
+    pandora::ClusterList m_newClustersList;
 };
 
 
