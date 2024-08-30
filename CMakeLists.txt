@@ -49,6 +49,8 @@ if (cetmodules_FOUND)
   find_package(Torch QUIET ${CET_EXPORT})
   if (Torch_FOUND)
     set(PANDORA_LIBTORCH_DEF ON)
+    find_package(TorchSparse REQUIRED) #ADDED
+    find_package(TorchScatter REQUIRED) #ADDED
   else()
     set(PANDORA_LIBTORCH_DEF OFF)
   endif()
@@ -72,6 +74,8 @@ file(GLOB_RECURSE ${PROJECT_NAME}_SRCS RELATIVE "${PROJECT_SOURCE_DIR}/${LAR_CON
 if (PANDORA_LIBTORCH)
   if (NOT cetmodules_FOUND)
     find_package(Torch REQUIRED ${CET_EXPORT})
+    find_package(TorchSparse REQUIRED ${CET_EXPORT}) #ADDED
+    find_package(TorchScatter REQUIRED ${CET_EXPORT}) #ADDED
   else()
     find_package(TBB REQUIRED EXPORT)
   endif()
@@ -132,6 +136,11 @@ else()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
         include_directories(${TORCH_INCLUDE_DIRS})
         link_libraries(${TORCH_LIBRARIES})
+        include_directories(${TorchSparse_INCLUDE_DIRS})
+        link_libraries(TorchSparse::TorchSparse)
+        include_directories(${TorchScatter_INCLUDE_DIRS})
+        link_libraries(TorchScatter::TorchScatter)
+
     endif()
 
     #-------------------------------------------------------------------------------------------------------------------------------------------

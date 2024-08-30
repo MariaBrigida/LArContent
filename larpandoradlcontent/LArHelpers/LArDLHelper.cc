@@ -31,6 +31,13 @@ StatusCode LArDLHelper::LoadModel(const std::string &filename, LArDLHelper::Torc
 
 //------------------------------------------------------------------------------------------------------------------------------------------
 
+void LArDLHelper::InitialiseInput(const at::IntArrayRef dimensions, TorchInput &tensor, at::ScalarType type = at::kFloat)
+{
+    tensor = torch::zeros(dimensions,type);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------
+
 void LArDLHelper::InitialiseInput(const at::IntArrayRef dimensions, TorchInput &tensor)
 {
     tensor = torch::zeros(dimensions);
