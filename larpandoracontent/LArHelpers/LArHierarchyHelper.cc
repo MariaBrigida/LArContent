@@ -899,7 +899,7 @@ void LArHierarchyHelper::RecoHierarchy::FillHierarchy(const PfoList &pfoList, co
                 m_interactions[pRoot].emplace_back(new Node(*this, allParticles, allHits));
             }
         }
-        else if (foldParameters.m_foldToLeadingShowers)
+        else if (foldParameters.m_foldToLeadingShowers || foldParameters.m_foldToLeadingIfShowerElseDynamic)
         {
             for (const ParticleFlowObject *pPrimary : primaries)
             {
