@@ -23,6 +23,7 @@ LArHierarchyHelper::FoldingParameters::FoldingParameters() :
     m_foldToLeadingShowers{false},
     m_foldToTier{false},
     m_foldDynamic{false},
+    m_foldToLeadingIfShowerElseDynamic{false},
     m_cosAngleTolerance{0.9962f},
     m_tier{1}
 {
@@ -34,6 +35,7 @@ LArHierarchyHelper::FoldingParameters::FoldingParameters(const bool foldDynamic,
     m_foldToLeadingShowers{false},
     m_foldToTier{false},
     m_foldDynamic{foldDynamic},
+    m_foldToLeadingIfShowerElseDynamic{false},
     m_cosAngleTolerance{cosAngleTolerance},
     m_tier{1}
 {
@@ -45,6 +47,7 @@ LArHierarchyHelper::FoldingParameters::FoldingParameters(const int foldingTier) 
     m_foldToLeadingShowers{false},
     m_foldToTier{true},
     m_foldDynamic{false},
+    m_foldToLeadingIfShowerElseDynamic{false},
     m_cosAngleTolerance{0.9962f},
     m_tier{foldingTier}
 {
@@ -219,6 +222,43 @@ void LArHierarchyHelper::MCHierarchy::FillHierarchy(const MCParticleList &mcPart
                 m_interactions[pRoot].emplace_back(pNode);
                 for (const MCParticle *pChild : childParticles)
                     pNode->FillHierarchy(pChild, foldParameters);
+            }
+        }
+        else if (foldParameters.m_foldToLeadingIfShowerElseDynamic)
+        {
+            for (const MCParticle *pPrimary : primaries)
+            {
+                MCParticleList allParticles{pPrimary};
+                MCParticleList leadingParticles, childParticles;
+
+                int pdg{std::abs(pPrimary->GetParticleId())};
+                const bool isShower{pdg == E_MINUS || pdg == E_PLUS || pdg == PHOTON};
+                const bool isNeutron{pdg == NEUTRON};
+
+                if (isShower || (isNeutron && !m_recoCriteria.m_removeNeutrons))
+                    LArMCParticleHelper::GetAllDescendentMCParticles(pPrimary, allParticles);
+                else
+                    this->InterpretHierarchy(pPrimary, leadingParticles, childParticles, foldParameters.m_cosAngleTolerance);
+                
+                allParticles.insert(allParticles.end(), leadingParticles.begin(), leadingParticles.end());
+
+                CaloHitList allHits;
+                for (const MCParticle *pMCParticle : allParticles)
+                {
+                    // ATTN - Not all MC particles will have hits
+                    if (m_mcToHitsMap.find(pMCParticle) != m_mcToHitsMap.end())
+                    {
+                        const CaloHitList &caloHits(m_mcToHitsMap.at(pMCParticle));
+                        allHits.insert(allHits.begin(), caloHits.begin(), caloHits.end());
+                    }
+                }
+
+                Node *pNode{new Node(*this, allParticles, allHits)};
+                m_interactions[pRoot].emplace_back(pNode);
+
+                for (const MCParticle *pChild : childParticles)
+                    pNode->FillHierarchy(pChild, foldParameters);
+   
             }
         }
         else

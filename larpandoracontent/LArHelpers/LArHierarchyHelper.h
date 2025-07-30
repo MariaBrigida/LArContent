@@ -55,6 +55,7 @@ public:
         bool m_foldToLeadingShowers; ///< Whether or not to fold shower children to the leading shower particle
         bool m_foldToTier;           ///< Whether or not to apply folding based on particle tier
         bool m_foldDynamic;          ///< Whether or not to use process and topological information to make folding decisions
+        bool m_foldToLeadingIfShowerElseDynamic; ///< Whether or not to fold shower children to the leading shower particle and use topological information to make folding decisions in all other cases
         float m_cosAngleTolerance;   ///< Cosine of the maximum angle at which topologies can be considered continuous
         int m_tier;                  ///< If folding to a tier, the tier to be combined with its child particles
     };
