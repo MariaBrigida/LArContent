@@ -63,6 +63,7 @@ private:
     bool m_foldToPrimaries;            ///< Whether or not to fold the hierarchy back to primary particles
     bool m_foldDynamic;                ///< Whether or not to fold the hierarchy dynamically
     bool m_foldToLeadingShowers;       ///< Whether or not to fold the hierarchy back to leading shower particles
+    bool m_foldToLeadingIfShowerElseDynamic;       ///< Whether or not to fold the hierarchy back to leading particles if showers, and dynamic otherwise
     bool m_validateEvent;              ///< Whether to validate at the level of an event
     bool m_validateMC;                 ///< Whether to validate at the level of MC nodes
     float m_minPurity;                 ///< Minimum purity to tag a node as being of good quality
