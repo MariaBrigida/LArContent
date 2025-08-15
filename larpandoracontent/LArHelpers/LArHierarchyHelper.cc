@@ -228,7 +228,7 @@ void LArHierarchyHelper::MCHierarchy::FillHierarchy(const MCParticleList &mcPart
         {
             for (const MCParticle *pPrimary : primaries)
             {
-                MCParticleList allParticles{pPrimary};
+                MCParticleList allParticles;
                 MCParticleList leadingParticles, childParticles;
 
                 int pdg{std::abs(pPrimary->GetParticleId())};
@@ -236,10 +236,13 @@ void LArHierarchyHelper::MCHierarchy::FillHierarchy(const MCParticleList &mcPart
                 const bool isNeutron{pdg == NEUTRON};
 
                 if (isShower || (isNeutron && !m_recoCriteria.m_removeNeutrons))
+	        {
+		    allParticles.push_back(pPrimary);
                     LArMCParticleHelper::GetAllDescendentMCParticles(pPrimary, allParticles);
+		}
                 else
                     this->InterpretHierarchy(pPrimary, leadingParticles, childParticles, foldParameters.m_cosAngleTolerance);
-                
+
                 allParticles.insert(allParticles.end(), leadingParticles.begin(), leadingParticles.end());
 
                 CaloHitList allHits;
